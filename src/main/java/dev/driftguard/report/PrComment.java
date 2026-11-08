@@ -54,7 +54,17 @@ public final class PrComment {
      * @param repoUrl like https://github.com/owner/repo, for links to the head commit's lines; may be null
      */
     public static String render(Diff diff, Audit base, Audit head, String repoUrl) {
-        Optional<String> blobBase = HtmlReport.blobBase(repoUrl, head.commit());
+        return render(diff, base, head, repoUrl, null);
+    }
+
+    /**
+     * @param linkCommit commit to link lines to, when the audited one is temporary. On a pull request,
+     *        actions/checkout audits GitHub's merge commit, which is replaced on every push, so links
+     *        should point at the PR's head commit instead.
+     */
+    public static String render(Diff diff, Audit base, Audit head, String repoUrl, String linkCommit) {
+        String shownCommit = linkCommit != null ? linkCommit : head.commit();
+        Optional<String> blobBase = HtmlReport.blobBase(repoUrl, shownCommit);
         StringBuilder out = new StringBuilder(MARKER).append("\n### DriftGuard\n\n");
 
         if (diff.newLikely().isEmpty() && diff.newLeads().isEmpty()) {
@@ -82,7 +92,7 @@ public final class PrComment {
         }
 
         out.append("<sub>Compares this PR's head");
-        if (head.commit() != null) out.append(" `").append(shortSha(head.commit())).append('`');
+        if (shownCommit != null) out.append(" `").append(shortSha(shownCommit)).append('`');
         out.append(" with its base");
         if (base.commit() != null) out.append(" `").append(shortSha(base.commit())).append('`');
         out.append(head.llmModel() == null ? ", static analysis only" : ", with LLM checks by " + md(head.llmModel()))

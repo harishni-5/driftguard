@@ -81,11 +81,12 @@ runs:
       env:
         FAIL_ON: ${{ inputs.fail-on }}
         REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       run: |
         set +e
         java -jar "$GITHUB_ACTION_PATH/target/driftguard.jar" diff \
           "$RUNNER_TEMP/driftguard-base.json" "$RUNNER_TEMP/driftguard-head.json" \
-          --repo-url "$REPO_URL" --fail-on "$FAIL_ON" --out "$RUNNER_TEMP/driftguard-comment.md" | tee "$RUNNER_TEMP/driftguard-diff.txt"
+          --repo-url "$REPO_URL" --link-commit "$HEAD_SHA" --fail-on "$FAIL_ON" --out "$RUNNER_TEMP/driftguard-comment.md" | tee "$RUNNER_TEMP/driftguard-diff.txt"
         code=${PIPESTATUS[0]}
         set -e
         if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then exit "$code"; fi
