@@ -4,7 +4,7 @@
 
 ![DriftGuard HTML report for e2b-dev/fragments](docs/images/report.png)
 
-*A real report: [fragments](https://github.com/e2b-dev/fragments)' README tells you to set `SUPABASE_URL`, but the code reads `NEXT_PUBLIC_SUPABASE_URL`. Following the docs leaves the setting empty. ([Full sample report](docs/sample-report.html), download it and open it in a browser.)*
+*A real report. [fragments](https://github.com/e2b-dev/fragments)' README tells you to set `SUPABASE_URL`, but the code reads `NEXT_PUBLIC_SUPABASE_URL`. Following the docs leaves the setting empty. (**[Open the live sample report →](https://harishni-5.github.io/driftguard/sample-report.html)**)*
 
 ## What it finds
 
