@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
+<title>DriftGuard: e2b-dev/fragments</title>
+<style>:root{--bg:#f7f7f5;--panel:#fff;--text:#1d1d1b;--muted:#5f5f5a;--line:#e3e2dd;--accent:#2f5bd3;
+--high:#b42318;--high-bg:#fdecea;--medium:#8a5a00;--medium-bg:#fdf3dc;--low:#3d5a80;--low-bg:#e8eef7;--code:#f0efea}
+@media (prefers-color-scheme:dark){:root{--bg:#161615;--panel:#1f1f1d;--text:#ecebe6;--muted:#a3a29b;--line:#34332f;
+--accent:#8aa8ff;--high:#ff9b8f;--high-bg:#3b1f1c;--medium:#f2c56b;--medium-bg:#3a2f17;--low:#9fb8dd;--low-bg:#1f2a3a;--code:#2a2926}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);
+font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+main{max-width:960px;margin:0 auto;padding:32px 16px 48px;min-width:0}
+header{margin-bottom:20px}.eyebrow{margin:0;color:var(--muted);font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+h1{margin:4px 0 8px;font-size:28px;line-height:1.2;overflow-wrap:anywhere}h2{font-size:20px;margin:32px 0 12px}
+h3{font-size:14px;margin:14px 0 6px;color:var(--muted)}
+.meta{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0;color:var(--muted);font-size:14px}
+code{font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--code);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(140px,100%),1fr));gap:10px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.tile .value{font-size:28px;font-weight:650;font-variant-numeric:tabular-nums}.tile .label{color:var(--muted);font-size:13px}
+.tile.likely .value{color:var(--high)}
+.filters{position:sticky;top:0;z-index:1;background:var(--bg);padding:12px 0;margin-top:20px;border-bottom:1px solid var(--line);
+display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{font:inherit;font-size:13px;padding:5px 12px;border-radius:999px;
+border:1px solid var(--line);background:var(--panel);color:var(--text);cursor:pointer;min-height:32px}
+.chip[aria-pressed=true]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.chip:focus-visible,.search input:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.search{flex:1 1 220px;min-width:0}.search input{width:100%;font:inherit;font-size:14px;padding:7px 10px;border-radius:8px;
+border:1px solid var(--line);background:var(--panel);color:var(--text);min-height:36px}
+.shown{margin:0;color:var(--muted);font-size:13px;flex-basis:100%}
+.count{color:var(--muted);font-weight:400}.note,.empty{color:var(--muted)}
+.finding{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin:8px 0}
+.finding[hidden]{display:none}
+summary{cursor:pointer;padding:12px 14px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;align-items:baseline;list-style:none}
+summary::-webkit-details-marker{display:none}
+.title{font-weight:600;overflow-wrap:anywhere;min-width:0}.tags{grid-column:2;min-width:0;display:flex;flex-wrap:wrap;gap:4px 10px;color:var(--muted);font-size:13px}
+.where{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;overflow-wrap:anywhere}
+.sev{font-size:11px;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:5px}
+.sev.critical,.sev.high{color:var(--high);background:var(--high-bg)}.sev.medium{color:var(--medium);background:var(--medium-bg)}
+.sev.low{color:var(--low);background:var(--low-bg)}
+.body{padding:0 14px 14px;border-top:1px solid var(--line)}.body p{margin:10px 0}
+.evidence{list-style:none;padding:0;margin:0;display:grid;gap:6px}.evidence li{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;min-width:0}.evidence code{min-width:0}
+a{color:var(--accent)}.file{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;overflow-wrap:anywhere}
+.fix{background:var(--code);padding:8px 10px;border-radius:8px}.facts{color:var(--muted);font-size:13px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:12px}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:10px;font-size:14px}
+caption{text-align:left;font-weight:600;padding:0 0 6px}th,td{padding:6px 10px;border-top:1px solid var(--line);text-align:left}
+td{text-align:right;font-variant-numeric:tabular-nums}th{font-weight:400;color:var(--muted)}
+footer{margin-top:40px;color:var(--muted);font-size:13px}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media print{.filters{display:none}details{break-inside:avoid}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<p class="eyebrow">DriftGuard audit</p>
+<h1>e2b-dev/fragments</h1>
+<p class="meta"><span>commit <code>3b11c7fcd4dc</code></span><span>121 files</span><span>6,192 lines of Python/JS</span><span>2.3s</span><span>static analysis only</span></p>
+</header>
+<section class="tiles" aria-label="Summary">
+<div class="tile likely"><div class="value">3</div><div class="label">Likely issues</div></div>
+<div class="tile review"><div class="value">2</div><div class="label">Needs your review</div></div>
+<div class="tile agent"><div class="value">1</div><div class="label">Dead dependencies</div></div>
+<div class="tile agent"><div class="value">0</div><div class="label">Pattern drift</div></div>
+<div class="tile agent"><div class="value">4</div><div class="label">Docs vs code</div></div>
+</section>
+<nav class="filters" aria-label="Filter findings" hidden>
+<div class="chips" role="group" aria-label="Agent"><button type="button" class="chip" aria-pressed="true" data-agent="">All</button><button type="button" class="chip" aria-pressed="false" data-agent="spec-drift">Docs vs code</button><button type="button" class="chip" aria-pressed="false" data-agent="dead-dep">Dead dependencies</button></div>
+<label class="search"><span class="visually-hidden">Search findings</span><input type="search" placeholder="Search titles, files, evidence" autocomplete="off"></label>
+<p class="shown" aria-live="polite"></p>
+</nav>
+<section id="likely"><h2>Likely issues <span class="count">3</span></h2>
+<details class="finding" data-agent="spec-drift">
+<summary><span class="sev medium">MEDIUM</span><span class="title">Docs name the wrong variable: SUPABASE_ANON_KEY (code reads NEXT_PUBLIC_SUPABASE_ANON_KEY)</span><span class="tags"><span class="tag">Docs vs code</span><span class="where">README.md:112</span></span></summary>
+<div class="body">
+<p>The docs tell readers to set SUPABASE_ANON_KEY, but the code reads NEXT_PUBLIC_SUPABASE_ANON_KEY. Following the docs leaves the setting empty, and the framework only exposes the prefixed name to browser code.</p>
+<p class="loc"><a class="file" href="https://github.com/e2b-dev/fragments/blob/3b11c7fcd4dcc37b2f1effde35960cf6ec4bd3c7/README.md#L112" rel="noopener noreferrer" target="_blank">README.md:112</a></p>
+<h3>Evidence</h3>
+<ul class="evidence">
+<li><a class="file" href="https://github.com/e2b-dev/fragments/blob/3b11c7fcd4dcc37b2f1effde35960cf6ec4bd3c7/README.md#L112" rel="noopener noreferrer" target="_blank">README.md:112</a><code>SUPABASE_ANON_KEY=</code></li>
+</ul>
+<p class="fix"><strong>Fix:</strong> Change the docs to NEXT_PUBLIC_SUPABASE_ANON_KEY.</p>
+<p class="facts">Confidence high · decided by static analysis · <code>env-var</code></p>
+</div>
+</details>
+<details class="finding" data-agent="spec-drift">
+<summary><span class="sev medium">MEDIUM</span><span class="title">Docs name the wrong variable: SUPABASE_URL (code reads NEXT_PUBLIC_SUPABASE_URL)</span><span class="tags"><span class="tag">Docs vs code</span><span class="where">README.md:111</span></span></summary>
+<div class="body">
+<p>The docs tell readers to set SUPABASE_URL, but the code reads NEXT_PUBLIC_SUPABASE_URL. Following the docs leaves the setting empty, and the framework only exposes the prefixed name to browser code.</p>
+<p class="loc"><a class="file" href="https://github.com/e2b-dev/fragments/blob/3b11c7fcd4dcc37b2f1effde35960cf6ec4bd3c7/README.md#L111" rel="noopener noreferrer" target="_blank">README.md:111</a></p>
+<h3>Evidence</h3>
+<ul class="evidence">
+<li><a class="file" href="https://github.com/e2b-dev/fragments/blob/3b11c7fcd4dcc37b2f1effde35960cf6ec4bd3c7/README.md#L111" rel="noopener noreferrer" target="_blank">README.md:111</a><code>SUPABASE_URL=</code></li>
+</ul>
+<p class="fix"><strong>Fix:</strong> Change the docs to NEXT_PUBLIC_SUPABASE_URL.</p>
+<p class="facts">Confidence high · decided by static analysis · <code>env-var</code></p>
+</div>
+</details>
+<details class="finding" data-agent="spec-drift">
+<summary><span class="sev low">LOW</span><span class="title">Broken link: lib/templates.json</span><span class="tags"><span class="tag">Docs vs code</span><span class="where">README.md:188</span></span></summary>
+<div class="body">
+<p>This link points at a file that isn&#39;t in the repo, so readers get a 404.</p>
+<p class="loc"><a class="file" href="https://github.com/e2b-dev/fragments/blob/3b11c7fcd4dcc37b2f1effde35960cf6ec4bd3c7/README.md#L188" rel="noopener noreferrer" target="_blank">README.md:188</a></p>
+<h3>Evidence</h3>
+<ul class="evidence">
+<li><a class="file" href="https://github.com/e2b-dev/fragments/blob/3b11c7fcd4dcc37b2f1effde35960cf6ec4bd3c7/README.md#L188" rel="noopener noreferrer" target="_blank">README.md:188</a><code>7. Open [lib/templates.json](lib/templates.json) in your code editor.</code></li>
+</ul>
+<p class="fix"><strong>Fix:</strong> Point the link at the file&#39;s new location, or remove it.</p>
+<p class="facts">Confidence high · decided by static analysis · <code>missing-file</code></p>
+</div>
+</details>
+</section>
+<section id="review"><h2>Needs your review <span class="count">2</span></h2>
+<p class="note">Static analysis couldn't settle these, and any LLM opinion shown may be wrong. Treat them as leads, not facts.</p>
+<details class="finding" data-agent="spec-drift">
+<summary><span class="sev medium">MEDIUM</span><span class="title">Documented variable is never read: GOOGLE_AI_API_KEY</span><span class="tags"><span class="tag">Docs vs code</span><span class="where">README.md:86</span></span></summary>
+<div class="body">
+<p>The docs tell readers to set GOOGLE_AI_API_KEY and no code mentions it by name, but the @ai-sdk/google may read it on its own.</p>
+<p class="loc"><a class="file" href="https://github.com/e2b-dev/fragments/blob/3b11c7fcd4dcc37b2f1effde35960cf6ec4bd3c7/README.md#L86" rel="noopener noreferrer" target="_blank">README.md:86</a></p>
+<h3>Evidence</h3>
+<ul class="evidence">
+<li><a class="file" href="https://github.com/e2b-dev/fragments/blob/3b11c7fcd4dcc37b2f1effde35960cf6ec4bd3c7/README.md#L86" rel="noopener noreferrer" target="_blank">README.md:86</a><code>GOOGLE_AI_API_KEY=</code></li>
+</ul>
+<p class="fix"><strong>Fix:</strong> If the setting was removed, delete it from the docs. If it was renamed, document the new name.</p>
+<p class="facts">Confidence low · decided by nobody yet · <code>env-var</code></p>
+</div>
+</details>
+<details class="finding" data-agent="dead-dep">
+<summary><span class="sev low">LOW</span><span class="title">Possibly unused dev dependency: eslint-config-next</span><span class="tags"><span class="tag">Dead dependencies</span><span class="where">package.json:70</span></span></summary>
+<div class="body">
+<p>Build or lint tool with no direct reference. It may be configured under a short name or run by hand.</p>
+<p class="loc"><a class="file" href="https://github.com/e2b-dev/fragments/blob/3b11c7fcd4dcc37b2f1effde35960cf6ec4bd3c7/package.json#L70" rel="noopener noreferrer" target="_blank">package.json:70</a></p>
+<p class="fix"><strong>Fix:</strong> Check whether anything needs eslint-config-next first. If not, remove it from package.json and run your tests and build.</p>
+<p class="facts">Confidence low · decided by nobody yet · <code>unused-dependency</code></p>
+</div>
+</details>
+</section>
+<section class="details"><h2>How this audit ran</h2>
+<div class="stats">
+<table><caption>Dead dependencies</caption><tbody>
+<tr><th scope="row">Declared</th><td>57</td></tr>
+<tr><th scope="row">Used</th><td>56</td></tr>
+<tr><th scope="row">Unused by static analysis</th><td>0</td></tr>
+<tr><th scope="row">Sent to review</th><td>1</td></tr>
+<tr><th scope="row">LLM confirmed unused</th><td>0</td></tr>
+<tr><th scope="row">LLM found used</th><td>0</td></tr>
+<tr><th scope="row">Still unverified</th><td>1</td></tr>
+</tbody></table>
+<table><caption>Pattern drift</caption><tbody>
+<tr><th scope="row">Competing libraries</th><td>0</td></tr>
+<tr><th scope="row">Copied code groups</th><td>0</td></tr>
+<tr><th scope="row">Similar groups found</th><td>0</td></tr>
+<tr><th scope="row">LLM confirmed same job</th><td>0</td></tr>
+<tr><th scope="row">LLM said not drift</th><td>0</td></tr>
+<tr><th scope="row">Still unverified</th><td>0</td></tr>
+</tbody></table>
+<table><caption>Docs vs code</caption><tbody>
+<tr><th scope="row">Docs scanned</th><td>1</td></tr>
+<tr><th scope="row">Env vars documented</th><td>23</td></tr>
+<tr><th scope="row">Env vars never read</th><td>3</td></tr>
+<tr><th scope="row">Scripts documented</th><td>2</td></tr>
+<tr><th scope="row">Scripts missing</th><td>0</td></tr>
+<tr><th scope="row">Paths checked</th><td>6</td></tr>
+<tr><th scope="row">Paths missing</th><td>1</td></tr>
+</tbody></table>
+</div>
+</section>
+<footer>Generated by DriftGuard 0.1.0. Findings are leads for a person to check, not verdicts.</footer>
+</main>
+<script>(()=>{const nav=document.querySelector('.filters');if(!nav)return;nav.hidden=false;
+const chips=[...nav.querySelectorAll('.chip')],input=nav.querySelector('input'),shown=nav.querySelector('.shown'),
+cards=[...document.querySelectorAll('.finding')];let agent='';
+function apply(){const q=input.value.trim().toLowerCase();let n=0;
+for(const c of cards){const ok=(!agent||c.dataset.agent===agent)&&(!q||c.textContent.toLowerCase().includes(q));c.hidden=!ok;if(ok)n++;}
+for(const s of document.querySelectorAll('section[id]')){const all=s.querySelectorAll('.finding').length,
+vis=s.querySelectorAll('.finding:not([hidden])').length,count=s.querySelector('.count');if(count)count.textContent=all===vis?all:vis+' of '+all;}
+shown.textContent=n===cards.length?'':'Showing '+n+' of '+cards.length+' findings';}
+chips.forEach(b=>b.addEventListener('click',()=>{agent=b.dataset.agent;chips.forEach(x=>x.setAttribute('aria-pressed',String(x===b)));apply();}));
+input.addEventListener('input',apply);})();
+</script>
+</body>
+</html>
