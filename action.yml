@@ -34,7 +34,7 @@ runs:
         echo "::error::DriftGuard compares a pull request with its base, so run it on the pull_request event."
         exit 1
 
-    - uses: actions/setup-java@v4
+    - uses: actions/setup-java@v5
       with:
         distribution: temurin
         java-version: "21"
