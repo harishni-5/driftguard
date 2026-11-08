@@ -76,13 +76,13 @@ The labels are one person's judgment. The line between "same job" and "same shap
 
 ```
 src/main/java/dev/driftguard/
-  cli/        picocli commands (audit, eval, doctor)
+  cli/        picocli commands (audit, diff, eval, doctor)
   ingest/     clone or open a repo, walk files, run the parser helpers
   manifest/   read requirements.txt, pyproject.toml, Pipfile, setup.py, setup.cfg, package.json
   agents/     AuditAgent interface, Finding, and one package per agent
   llm/        LlmClient interface, provider selection, OpenAI-format client (Groq, Gemini, Ollama), Claude client
   store/      all SQLite access
-  report/     Markdown and HTML output
+  report/     Markdown, HTML and JSON output, and the pull request comment
 src/main/resources/
   helpers/    parser subprocesses: Python (ast) and Node (vendored Babel)
   db/         schema.sql
@@ -90,6 +90,10 @@ src/main/resources/
 ```
 
 **To add an agent:** implement `AuditAgent`, then add it to the list in `AuditCommand`. Agents get the parsed repo, an optional `LlmClient` and a trace sink, and they return findings. Tokens, cost and latency get recorded through the trace sink, so they land in `agent_traces`.
+
+## Pull request mode
+
+`action.yml` audits a PR's base commit and its head with `--out x.json`, then `driftguard diff base.json head.json` keeps only findings whose fingerprint is new. Fingerprints are built from file paths, names and the finding type, never line numbers. JSON output lists every Pattern-Drift group, not just the strongest 15, so a group dropping out of a top list can't look like a fix. Text from the repo is escaped in the comment, so a crafted file name can't @mention people, inject links or break the table.
 
 ## Known limits
 

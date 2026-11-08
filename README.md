@@ -51,7 +51,31 @@ java -jar target/driftguard.jar audit path/to/your/repo --out report.html
 
 `read -rs` waits for you to paste the key without showing it on screen.
 
-Options: `--out` (`.md` or `.html`), `--no-llm`, `--llm` (`groq`, `gemini`, `ollama` or `claude`), `--model`, `--db`.
+Options: `--out` (`.md`, `.html` or `.json`), `--no-llm`, `--llm` (`groq`, `gemini`, `ollama` or `claude`), `--model`, `--db`.
+
+## Use it on pull requests
+
+Add this file as `.github/workflows/driftguard.yml` in your repo:
+
+```yaml
+name: DriftGuard
+on: pull_request
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  driftguard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: harishni-5/driftguard@master
+        with:
+          fail-on: none   # or "likely" to fail the check when a PR adds likely issues
+```
+
+On every pull request it audits the base and the head, then posts one comment listing only the drift **that PR added**, plus anything it fixed. Later pushes update the same comment. Findings match by fingerprint, not line number, so moving code around doesn't count as new drift. The full HTML report is attached to the run as an artifact.
+
+It runs static analysis only: no API key, nothing leaves the runner, and the same code always gives the same result. It uses the safe `pull_request` trigger and only parses the PR's code, never runs it. Pull requests from forks get a read-only token, so there the summary appears on the run page instead of as a comment.
 
 ## How it works
 
@@ -95,11 +119,11 @@ The audited repo is treated as untrusted:
 ./mvnw test
 ```
 
-108 tests. They need Python and Node on your PATH but no API key: LLM clients are tested against a local fake server.
+112 tests, run on Linux and Windows in CI. They need Python and Node on your PATH but no API key: LLM clients are tested against a local fake server.
 
 ## Status and limits
 
-Working: ingestion, the three agents, Markdown and HTML reports, and the eval harness, for Python and JS/TS. Next: a GitHub Action that comments on pull requests.
+Working: ingestion, the three agents, Markdown, HTML and JSON reports, the pull request Action, and the eval harness, for Python and JS/TS.
 
 Known limits: functions that do the same job in very different words are missed; Spec-Drift checks concrete things like links and commands, not prose claims like "supports PDF export"; Java repos aren't audited yet. The full list is in [docs/how-it-works.md](docs/how-it-works.md#known-limits).
 

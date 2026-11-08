@@ -33,7 +33,7 @@ Dead deps are already well served by free tools like deptry and depcheck, so Dea
 | Later, optional | Spec-Drift with an LLM: feature claims in prose ("supports PDF export") checked against code. Error-handling style. Embeddings. | Only if time allows |
 | Done | **HTML report** (self-contained, filters, GitHub line links, escapes repo text) and a private GitHub repo | Something a recruiter can see |
 | Next | Public README with results and a viewable sample report, then make the repo public | The page a recruiter actually lands on |
-| Dec 22-28 | **GitHub Action**: comments on a PR when it adds a new competing pattern | Shows real-world engineering |
+| Done | **GitHub Action**: audits a PR's base and head, comments with only the drift that PR added, plus CI on Linux and Windows | Shows real-world engineering |
 | Dec 29-Jan 4 | **Test on 20-30 real repos** with hand-checked results | Real numbers, such as "X% of findings confirmed by hand on 25 repos" |
 | After that, if time allows | Orphan-Code, Q&A, Spring Boot and React web UI | Nice extras; first to cut if you fall behind |
 

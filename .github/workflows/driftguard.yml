@@ -1,0 +1,15 @@
+# DriftGuard checks its own pull requests with the action in this repo.
+name: DriftGuard
+
+on: pull_request
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  driftguard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
