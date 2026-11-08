@@ -47,7 +47,7 @@ public final class SpecDriftAgent implements AuditAgent {
 
     private static final Pattern DOC_FILE = Pattern.compile("(?i).*\\.(md|mdx|markdown)$");
     private static final Pattern HISTORY_DOC = Pattern.compile(
-            "(?i)(^|.*/)(changelog|changes|history|release[-_ ]?notes?|releases|news|upgrading|migration[^/]*)(\\.[a-z]+)?$"
+            "(?i)(^|.*/)(changelog|changes|history|release[-_ ]?notes?|releases|news|upgrading|migration[^/]*|decisions?|decision[-_]log)(\\.[a-z]+)?$"
             // Proposals, RFCs and blog posts describe plans or the past, not what the code does today.
             + "|(?i)(^|.*/)(\\.github|changelogs?|releases?|proposals?|rfcs?|adrs?|decisions|blog|posts|plans?|ideas|design-docs?)/.*");
     private static final Pattern TEXT_DOC = Pattern.compile("(?i).*\\.(md|mdx|markdown|rst|txt|adoc)$");

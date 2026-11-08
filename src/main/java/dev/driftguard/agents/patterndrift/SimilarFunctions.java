@@ -86,7 +86,7 @@ final class SimilarFunctions {
     private SimilarFunctions() {}
 
     static Result find(RepoSnapshot snapshot, CodeAreas areas) {
-        List<Candidate> all = collect(snapshot);
+        List<Candidate> all = collect(snapshot, areas);
 
         Map<String, List<Candidate>> byBody = new HashMap<>();
         for (Candidate candidate : all) {
@@ -176,13 +176,13 @@ final class SimilarFunctions {
         return !overlapping && score >= SAME_FILE_THRESHOLD;
     }
 
-    private static List<Candidate> collect(RepoSnapshot snapshot) {
+    private static List<Candidate> collect(RepoSnapshot snapshot, CodeAreas areas) {
         Map<String, SourceFile> filesByPath = new HashMap<>();
         for (SourceFile file : snapshot.files()) filesByPath.put(file.path(), file);
 
         List<Candidate> candidates = new ArrayList<>();
         for (ParsedFile parsed : snapshot.parsedFiles()) {
-            if (!CodeAreas.isProductCode(parsed.path()) || parsed.path().endsWith(".ipynb") || parsed.symbols().isEmpty()) continue;
+            if (!areas.isProductCode(parsed.path()) || parsed.path().endsWith(".ipynb") || parsed.symbols().isEmpty()) continue;
             List<String> lines = readLines(filesByPath.get(parsed.path()));
             for (ParsedFile.SymbolDef symbol : parsed.symbols()) {
                 if (symbol.kind().equals("class")) continue;

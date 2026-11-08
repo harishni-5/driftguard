@@ -29,7 +29,7 @@ final class CompetingLibraries {
     static List<Finding> find(RepoSnapshot snapshot, CodeAreas areas) {
         Map<String, List<ParsedFile>> byProject = new LinkedHashMap<>();
         for (ParsedFile file : snapshot.parsedFiles()) {
-            if (CodeAreas.isProductCode(file.path())) {
+            if (areas.isProductCode(file.path())) {
                 byProject.computeIfAbsent(areas.projectOf(file.path()), key -> new ArrayList<>()).add(file);
             }
         }

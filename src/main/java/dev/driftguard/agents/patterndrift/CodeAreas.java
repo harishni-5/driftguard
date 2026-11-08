@@ -24,17 +24,41 @@ final class CodeAreas {
     private static final Set<String> PROJECT_MARKERS =
             Set.of("package.json", "pyproject.toml", "setup.py", "setup.cfg", "Pipfile", "requirements.txt");
 
+    /** No hand-written source file gets this long; bundles and vendored parsers do. */
+    static final int THIRD_PARTY_LINES = 10_000;
+
     private final Set<String> projectDirs = new HashSet<>();
+    private final Set<String> thirdParty = new HashSet<>();
 
     CodeAreas(RepoSnapshot snapshot) {
+        Set<String> paths = new HashSet<>();
+        for (SourceFile file : snapshot.files()) paths.add(file.path());
         for (SourceFile file : snapshot.files()) {
             String path = file.path();
             int slash = path.lastIndexOf('/');
             if (PROJECT_MARKERS.contains(path.substring(slash + 1))) projectDirs.add(slash < 0 ? "" : path.substring(0, slash));
+            if (file.loc() > THIRD_PARTY_LINES || hasOwnLicense(path, paths)) thirdParty.add(path);
         }
     }
 
-    static boolean isProductCode(String path) {
+    /** foo.js next to foo.LICENSE or foo.js.LICENSE.txt is someone else's code, copied in with its license. */
+    private static boolean hasOwnLicense(String path, Set<String> paths) {
+        int dot = path.lastIndexOf('.');
+        String stem = dot > path.lastIndexOf('/') ? path.substring(0, dot) : path;
+        for (String base : List.of(path, stem)) {
+            for (String suffix : List.of(".LICENSE", ".LICENSE.txt", ".license", ".license.txt")) {
+                if (paths.contains(base + suffix)) return true;
+            }
+        }
+        return false;
+    }
+
+    /** Product code the project wrote itself: not tests or samples, and not vendored or bundled files. */
+    boolean isProductCode(String path) {
+        return isProductPath(path) && !thirdParty.contains(path);
+    }
+
+    static boolean isProductPath(String path) {
         String lower = path.toLowerCase(Locale.ROOT);
         return !NOT_PRODUCT.matcher(lower).matches() && !VENDORED_UI.matcher(lower).matches();
     }

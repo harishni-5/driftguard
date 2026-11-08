@@ -141,6 +141,8 @@ Real examples it found:
 
 **Resume-ready claim:** "Built a static doc-vs-code checker. On 5 unseen open-source repos, 40 of 41 findings it ranked as likely issues were confirmed by hand. Weaker checks, like 'variable never read' at 27%, are routed to review instead."
 
+**Auditing DriftGuard with itself (2026-11-08):** running it on its own repo found 14 false "drift" findings in the vendored Babel parser, plus a decision log read as instructions. Now files over 10,000 lines, or with their own `.LICENSE` file next to them, count as third-party and are skipped by Pattern-Drift. Decision logs are skipped by Spec-Drift like changelogs. What remains on its own repo is one review-level lead: the README quotes another repo's variable as an example.
+
 ## What hasn't been verified
 
 - **Gemini live:** needs a free key, and it's only been tested against a local fake server. Groq now works live.
