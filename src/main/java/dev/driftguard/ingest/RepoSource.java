@@ -29,13 +29,19 @@ public final class RepoSource implements AutoCloseable {
     }
 
     public static RepoSource open(String input) throws IOException, InterruptedException {
-        if (input.contains("://")) {
+        // "://" is a URL; "::" is git's transport syntax (ext::, fd::), which can run commands.
+        if (input.contains("://") || input.contains("::")) {
             if (!SAFE_URL.matcher(input).matches()) {
                 throw new IOException("Only plain https:// repo URLs are supported, got: " + input);
             }
             return new RepoSource(input, cloneShallow(input), true);
         }
-        Path path = Path.of(input).toAbsolutePath().normalize();
+        Path path;
+        try {
+            path = Path.of(input).toAbsolutePath().normalize();
+        } catch (java.nio.file.InvalidPathException e) {
+            throw new IOException("Not a valid folder path: " + input);
+        }
         if (!Files.isDirectory(path)) throw new IOException("Not a folder: " + path);
         return new RepoSource(path.toString(), path, false);
     }
