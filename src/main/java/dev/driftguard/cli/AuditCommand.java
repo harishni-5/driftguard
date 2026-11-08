@@ -8,6 +8,7 @@ import dev.driftguard.agents.specdrift.SpecDriftAgent;
 import dev.driftguard.llm.LlmClient;
 import dev.driftguard.llm.LlmFactory;
 import dev.driftguard.report.HtmlReport;
+import dev.driftguard.report.JsonReport;
 import dev.driftguard.report.MarkdownReport;
 import dev.driftguard.store.Database;
 import java.io.IOException;
@@ -26,7 +27,7 @@ final class AuditCommand implements Callable<Integer> {
     @Parameters(index = "0", paramLabel = "REPO", description = "Local folder or https:// git URL.")
     private String repo;
 
-    @Option(names = "--out", description = "Where to write the report. A name ending in .html gets the HTML report, anything else Markdown. Default: ${DEFAULT-VALUE}.")
+    @Option(names = "--out", description = "Where to write the report. A name ending in .html gets the HTML report, .json a machine-readable one for `diff`, anything else Markdown. Default: ${DEFAULT-VALUE}.")
     private Path out = Path.of("driftguard-report.md");
 
     @Option(names = "--db", description = "SQLite database file. Default: ${DEFAULT-VALUE}.")
@@ -45,10 +46,13 @@ final class AuditCommand implements Callable<Integer> {
     public Integer call() {
         try (Database database = Database.open(db)) {
             LlmClient llm = createLlm();
-            List<AuditAgent> agents = List.of(new DeadDepAgent(), new PatternDriftAgent(), new SpecDriftAgent());
+            String name = out.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+            boolean json = name.endsWith(".json");
+            // JSON is for comparing commits, so it lists every group rather than the strongest few.
+            List<AuditAgent> agents = List.of(new DeadDepAgent(), new PatternDriftAgent(json), new SpecDriftAgent());
             AuditPipeline.Result result = AuditPipeline.run(repo, database, llm, agents);
-            boolean html = out.getFileName().toString().toLowerCase(java.util.Locale.ROOT).matches(".*\\.html?$");
-            Files.writeString(out, html ? HtmlReport.render(result) : MarkdownReport.render(result));
+            boolean html = name.matches(".*\\.html?$");
+            Files.writeString(out, json ? JsonReport.render(result) : html ? HtmlReport.render(result) : MarkdownReport.render(result));
 
             System.out.printf("Audited %d files in %.1fs: %d findings%n",
                     result.snapshot().files().size(), result.durationMs() / 1000.0, result.findings().size());

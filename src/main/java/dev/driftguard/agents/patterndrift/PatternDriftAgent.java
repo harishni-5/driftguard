@@ -106,6 +106,21 @@ public final class PatternDriftAgent implements AuditAgent {
 
     public record GroupReview(Decision decision, String purpose, String differences) {}
 
+    private final boolean reportEverything;
+
+    /** For people: the strongest groups only, so the report stays readable. */
+    public PatternDriftAgent() {
+        this(false);
+    }
+
+    /**
+     * @param reportEverything report every group (still LLM-checking at most {@code MAX_LLM_GROUPS}),
+     *        so comparing two commits can't mistake a group dropping out of the top list for a fix
+     */
+    public PatternDriftAgent(boolean reportEverything) {
+        this.reportEverything = reportEverything;
+    }
+
     @Override
     public String name() {
         return NAME;
@@ -122,13 +137,14 @@ public final class PatternDriftAgent implements AuditAgent {
 
         SimilarFunctions.Result similarity = SimilarFunctions.find(snapshot, areas);
         List<Group> copies = similarity.exactCopies();
-        for (Group group : copies.subList(0, Math.min(MAX_REPORTED_COPIES, copies.size()))) findings.add(toCopyFinding(group));
-        if (copies.size() > MAX_REPORTED_COPIES) {
+        int copyLimit = reportEverything ? copies.size() : MAX_REPORTED_COPIES;
+        for (Group group : copies.subList(0, Math.min(copyLimit, copies.size()))) findings.add(toCopyFinding(group));
+        if (copies.size() > copyLimit) {
             warnings.add("Pattern-Drift found " + copies.size() + " groups of copied code and reports the largest " + MAX_REPORTED_COPIES + ".");
         }
 
         List<Group> groups = similarity.similar();
-        List<Group> reported = groups.subList(0, Math.min(MAX_LLM_GROUPS, groups.size()));
+        List<Group> reported = reportEverything ? groups : groups.subList(0, Math.min(MAX_LLM_GROUPS, groups.size()));
         if (groups.size() > reported.size()) {
             warnings.add("Pattern-Drift found " + groups.size() + " similar-function groups and reports the strongest "
                     + reported.size() + ".");
@@ -142,7 +158,7 @@ public final class PatternDriftAgent implements AuditAgent {
         for (int i = 0; i < reported.size(); i++) {
             Group group = reported.get(i);
             GroupReview review = null;
-            if (llmAvailable) {
+            if (llmAvailable && i < MAX_LLM_GROUPS) {
                 review = reviewGroup(context, group, step++, warnings);
                 if (review == null) llmAvailable = false; // stop after a failure instead of repeating it
             }
