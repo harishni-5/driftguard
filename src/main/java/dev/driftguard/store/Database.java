@@ -48,13 +48,23 @@ public final class Database implements AutoCloseable {
 
     private static Database connect(String url) throws SQLException, IOException {
         Connection connection = DriverManager.getConnection(url);
-        try (Statement statement = connection.createStatement()) {
-            statement.execute("PRAGMA foreign_keys = ON");
-            statement.execute("PRAGMA journal_mode = WAL");
+        try {
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("PRAGMA foreign_keys = ON");
+                statement.execute("PRAGMA journal_mode = WAL");
+            }
+            Database database = new Database(connection);
+            database.migrate();
+            return database;
+        } catch (SQLException | IOException | RuntimeException e) {
+            // Close on failure too: Windows keeps an open database file locked, so nothing could delete or reuse it.
+            try {
+                connection.close();
+            } catch (SQLException closeFailure) {
+                e.addSuppressed(closeFailure);
+            }
+            throw e;
         }
-        Database database = new Database(connection);
-        database.migrate();
-        return database;
     }
 
     private void migrate() throws SQLException, IOException {

@@ -145,8 +145,13 @@ class IngestionAndStorageTest {
     void doesNotFollowSymlinksOutOfTheRepo(@TempDir Path outside) throws Exception {
         Files.writeString(outside.resolve("private.py"), "import stolen\n");
         TestRepo repo = new TestRepo(dir).file("app.py", "x = 1\n");
-        Files.createSymbolicLink(dir.resolve("link.py"), outside.resolve("private.py"));
-        Files.createSymbolicLink(dir.resolve("linkdir"), outside);
+        try {
+            Files.createSymbolicLink(dir.resolve("link.py"), outside.resolve("private.py"));
+            Files.createSymbolicLink(dir.resolve("linkdir"), outside);
+        } catch (java.nio.file.FileSystemException | UnsupportedOperationException e) {
+            // Windows only lets admins or Developer Mode create symlinks, so there's nothing to test.
+            org.junit.jupiter.api.Assumptions.abort("can't create symlinks here: " + e.getMessage());
+        }
 
         assertEquals(List.of("app.py"), repo.snapshot().files().stream().map(SourceFile::path).toList());
     }
