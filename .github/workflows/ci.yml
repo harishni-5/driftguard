@@ -17,7 +17,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
@@ -34,6 +34,17 @@ jobs:
       - name: Build and test (Windows)
         if: runner.os == 'Windows'
         run: .\mvnw.cmd -B package
+      # Job logs need a login to read, but annotations are public, so failures are surfaced there.
+      - name: Report failing tests
+        if: failure()
+        shell: bash
+        run: |
+          for f in target/surefire-reports/*.txt; do
+            [ -f "$f" ] || continue
+            grep -qE "FAILURE|ERROR" "$f" || continue
+            body=$(grep -vE "^\s+at (java|org\.junit|org\.apache|jdk)\." "$f" | head -40 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=$(basename "$f" .txt)::$body"
+          done
       - name: Audit a public repo with the built jar
         shell: bash
         run: java -jar target/driftguard.jar audit https://github.com/e2b-dev/fragments --no-llm --out report.html
