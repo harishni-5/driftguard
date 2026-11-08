@@ -1,0 +1,318 @@
+{
+  "description": "Held-out hand labels, made with eval/LABELING.md before any model saw these groups. Used to check prompt changes tuned on pattern-drift-labels.json.",
+  "repos": [
+    {
+      "name": "ai-chatbot",
+      "source": "https://github.com/vercel/ai-chatbot",
+      "commit": "a8989b522fa3672a2ae52f053105e40993b36ca1",
+      "groups": [
+        {
+          "members": [
+            "components/chat/sheet-editor.tsx::areEqual",
+            "components/chat/text-editor.tsx::areEqual"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Each editor's own React.memo comparator over its own props."
+        },
+        {
+          "members": [
+            "app/(chat)/actions.ts::updateChatVisibility",
+            "lib/db/queries.ts::updateChatVisibilityById"
+          ],
+          "label": "DIFFERENT_JOBS",
+          "note": "Server action that checks ownership, and the database query it calls."
+        }
+      ]
+    },
+    {
+      "name": "gpt-researcher",
+      "source": "https://github.com/assafelovic/gpt-researcher",
+      "commit": "3582a6841fe7dc801e2a34e34ee408641aea9bce",
+      "groups": [
+        {
+          "members": [
+            "evals/quality_eval/benchmark.py::_get_git_commit",
+            "evals/quality_eval/run_eval.py::_get_git_commit"
+          ],
+          "label": "SAME_JOB",
+          "note": "Identical helper copied into two eval scripts."
+        },
+        {
+          "members": [
+            "gpt_researcher/llm_provider/image/image_generator.py::ImageGeneratorProvider._ensure_output_dir",
+            "gpt_researcher/llm_provider/image/modelslab_image_generator.py::ModelsLabImageGeneratorProvider._ensure_output_dir"
+          ],
+          "label": "SAME_JOB",
+          "note": "Identical output-folder helper in two image generator providers; not specific to either API."
+        },
+        {
+          "members": [
+            "gpt_researcher/retrievers/google/google.py::GoogleSearch.get_api_key",
+            "gpt_researcher/retrievers/google/google.py::GoogleSearch.get_cx_key"
+          ],
+          "label": "SAME_JOB",
+          "note": "Read an env var or raise, written twice in one class with only the variable name changed."
+        },
+        {
+          "members": [
+            "gpt_researcher/context/compression.py::ContextCompressor.__get_contextual_retriever",
+            "gpt_researcher/context/compression.py::WrittenContentCompressor.__get_contextual_retriever"
+          ],
+          "label": "SAME_JOB",
+          "note": "Same retriever pipeline built twice; only the base retriever differs, which could be a parameter."
+        },
+        {
+          "members": [
+            "evals/quality_eval/benchmark.py::_avg",
+            "evals/quality_eval/run_eval.py::main.avg"
+          ],
+          "label": "SAME_JOB",
+          "note": "The same averaging helper copied into two eval scripts; one also converts to float."
+        },
+        {
+          "members": [
+            "frontend/nextjs/components/ResearchBlocks/elements/ChatInput.tsx::ChatInput.handleKeyDown",
+            "frontend/nextjs/components/ResearchBlocks/elements/InputArea.tsx::InputArea.handleKeyDown"
+          ],
+          "label": "SAME_JOB",
+          "note": "Same Enter-to-submit handler in two input components, drifted slightly (one trims, one calls reset)."
+        },
+        {
+          "members": [
+            "frontend/nextjs/app/page.tsx::Home.handleChat",
+            "frontend/nextjs/app/page.tsx::Home.handleMobileChat",
+            "frontend/nextjs/app/research/[id]/page.tsx::ResearchPage.handleChat",
+            "frontend/nextjs/src/GPTResearcher.tsx::GPTResearcher.handleChat"
+          ],
+          "label": "SAME_JOB",
+          "note": "Send a chat message to /api/chat and update the UI, written four ways with drifted payloads, timeouts and error handling."
+        },
+        {
+          "members": [
+            "gpt_researcher/document/document.py::DocumentLoader._load_document",
+            "gpt_researcher/document/online_document.py::OnlineDocumentLoader._load_document"
+          ],
+          "label": "SAME_JOB",
+          "note": "Same file-type loader table copied; the copies drifted (epub and html missing in one, different error handling)."
+        },
+        {
+          "members": [
+            "gpt_researcher/prompts.py::PromptFamily.generate_deep_research_prompt",
+            "gpt_researcher/prompts.py::PromptFamily.generate_report_prompt"
+          ],
+          "label": "DIFFERENT_JOBS",
+          "note": "Two different report prompts. They share a copied reference-list block, but the prompts themselves differ."
+        },
+        {
+          "members": [
+            "frontend/nextjs/app/page.tsx::Home.handleCopyUrl",
+            "frontend/nextjs/app/research/[id]/page.tsx::ResearchPage.handleCopyUrl",
+            "frontend/nextjs/components/ResearchBlocks/ChatResponse.tsx::ChatResponse.copyToClipboard"
+          ],
+          "label": "SAME_JOB",
+          "note": "Copy text to the clipboard with success and error toasts, three times; only the text and messages differ."
+        },
+        {
+          "members": [
+            "gpt_researcher/retrievers/crw/crw.py::CRWRetriever.get_api_key",
+            "gpt_researcher/retrievers/tavily/tavily_search.py::TavilySearch.get_api_key",
+            "gpt_researcher/scraper/tavily_extract/tavily_extract.py::TavilyExtract.get_api_key"
+          ],
+          "label": "SAME_JOB",
+          "note": "Header-or-env API key lookup copied per retriever, and drifted: TavilyExtract raises while TavilySearch returns blank for the same key."
+        },
+        {
+          "members": [
+            "deep_agents/breadth_benchmark.py::summarize",
+            "deep_agents/recency_benchmark.py::summarize"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Each standalone benchmark script summarizes its own record format; recency adds per-domain stats."
+        },
+        {
+          "members": [
+            "gpt_researcher/retrievers/getxapi/getxapi.py::GetXAPISearch._search_tweets",
+            "gpt_researcher/retrievers/xquik/xquik.py::XquikSearch._search_tweets"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "One adapter per external tweet-search API."
+        },
+        {
+          "members": [
+            "gpt_researcher/agent.py::GPTResearcher.get_similar_written_contents_by_draft_section_titles",
+            "gpt_researcher/skills/context_manager.py::ContextManager.get_similar_written_contents_by_draft_section_titles"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Facade method delegating to the context manager."
+        },
+        {
+          "members": [
+            "multi_agents/agents/fact_review.py::route_fact_check",
+            "multi_agents/agents/orchestrator.py::ChiefEditorAgent._route_fact_check"
+          ],
+          "label": "DIFFERENT_JOBS",
+          "note": "Router function and the graph edge that calls it and turns its exception into accept."
+        },
+        {
+          "members": [
+            "multi_agents/agents/draft_review.py::route_draft_review",
+            "multi_agents/agents/editor.py::EditorAgent._route_draft_review",
+            "multi_agents/agents/orchestrator.py::ChiefEditorAgent._route_human_feedback",
+            "multi_agents/agents/plan_review.py::route_human_feedback"
+          ],
+          "label": "UNCLEAR",
+          "note": "Mixed: two routers that duplicate each other's logic, plus two wrappers that call them."
+        },
+        {
+          "members": [
+            "frontend/nextjs/app/page.tsx::Home.renderMobileContent",
+            "frontend/nextjs/app/research/[id]/page.tsx::ResearchPage.renderMobileContent"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Each page renders its own mobile view from its own state."
+        },
+        {
+          "members": [
+            "deep_agents/benchmark.py::build_baseline_agent",
+            "deep_agents/hybrid_benchmark.py::build_baseline_files_agent"
+          ],
+          "label": "DIFFERENT_JOBS",
+          "note": "Build different agents. The inner search tool is copied verbatim (the code even says so), but the builders do different jobs."
+        },
+        {
+          "members": [
+            "gpt_researcher/mcp/client.py::MCPClientManager.get_all_tools",
+            "gpt_researcher/retrievers/mcp/retriever.py::MCPRetriever._get_all_tools"
+          ],
+          "label": "DIFFERENT_JOBS",
+          "note": "The retriever wraps the client manager with caching and streaming; caller and callee."
+        },
+        {
+          "members": [
+            "gpt_researcher/retrievers/searchapi/searchapi.py::SearchApiSearch.search",
+            "gpt_researcher/retrievers/serpapi/serpapi.py::SerpApiSearch.search"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "One adapter per search API."
+        },
+        {
+          "members": [
+            "gpt_researcher/retrievers/custom/custom.py::CustomRetriever._populate_params",
+            "gpt_researcher/retrievers/pubmed_central/pubmed_central.py::PubMedCentralSearch._populate_params"
+          ],
+          "label": "SAME_JOB",
+          "note": "Read prefixed environment variables into params; only the prefix differs, plus defaults in one."
+        },
+        {
+          "members": [
+            "evals/quality_eval/benchmark.py::_evaluate_query",
+            "evals/quality_eval/run_eval.py::evaluate_single_query"
+          ],
+          "label": "SAME_JOB",
+          "note": "Two eval scripts each run the researcher on a query and score the report; drifted feature sets."
+        },
+        {
+          "members": [
+            "gpt_researcher/llm_provider/generic/base.py::_check_pkg",
+            "gpt_researcher/retrievers/utils.py::check_pkg"
+          ],
+          "label": "SAME_JOB",
+          "note": "Two ways to handle a missing package: one auto-installs it, the other raises. Same job, inconsistent behavior."
+        },
+        {
+          "members": [
+            "gpt_researcher/context/compression.py::ContextCompressor.async_get_context",
+            "gpt_researcher/context/jev_filter.py::JevContextCompressor.async_get_context"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Two compressor strategies implementing the same method; only the small-input shortcut is copied."
+        },
+        {
+          "members": [
+            "gpt_researcher/prompts.py::PromptFamily.generate_image_analysis_prompt",
+            "gpt_researcher/skills/image_generator.py::ImageGenerator._build_analysis_prompt"
+          ],
+          "label": "SAME_JOB",
+          "note": "The same image-analysis prompt kept in two places, and the copies have drifted."
+        },
+        {
+          "members": [
+            "gpt_researcher/actions/retriever.py::_load_plugin_retriever",
+            "gpt_researcher/retrievers/utils.py::get_plugin_retriever_names"
+          ],
+          "label": "DIFFERENT_JOBS",
+          "note": "Load one plugin retriever vs list plugin names."
+        },
+        {
+          "members": [
+            "frontend/nextjs/components/ResearchBlocks/ChatInterface.tsx::ChatInterface.renderMessages",
+            "frontend/nextjs/components/mobile/MobileChatPanel.tsx::MobileChatPanel.processMessages"
+          ],
+          "label": "SAME_JOB",
+          "note": "Render chat messages from markdown to HTML for desktop and for mobile; the mobile copy adds types and error handling."
+        },
+        {
+          "members": [
+            "frontend/nextjs/app/page.tsx::Home.reset",
+            "frontend/nextjs/src/GPTResearcher.tsx::GPTResearcher.handleStartNewResearch"
+          ],
+          "label": "SAME_JOB",
+          "note": "Reset research state, written twice; the page version resets a few more fields."
+        }
+      ]
+    },
+    {
+      "name": "AgentGPT",
+      "source": "https://github.com/reworkd/AgentGPT",
+      "commit": "18b073ab05b2902e1d052c3d2799786d8623b5e5",
+      "groups": [
+        {
+          "members": [
+            "platform/reworkd_platform/web/api/agent/tools/code.py::Code.call",
+            "platform/reworkd_platform/web/api/agent/tools/reason.py::Reason.call",
+            "platform/reworkd_platform/web/api/agent/tools/utils.py::summarize"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Each tool class implements call with its own prompt; summarize is a helper with the same shape."
+        },
+        {
+          "members": [
+            "platform/reworkd_platform/web/api/agent/tools/sidsearch.py::SID.call",
+            "platform/reworkd_platform/web/api/agent/tools/tool.py::Tool.call"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "A tool implementation and the abstract base method it overrides."
+        },
+        {
+          "members": [
+            "platform/reworkd_platform/web/api/agent/agent_service/agent_service.py::AgentService.summarize_task_agent",
+            "platform/reworkd_platform/web/api/agent/agent_service/mock_agent_service.py::MockAgentService.summarize_task_agent"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "An abstract service method and its mock implementation."
+        }
+      ]
+    },
+    {
+      "name": "fragments",
+      "source": "https://github.com/e2b-dev/fragments",
+      "commit": "3b11c7fcd4dcc37b2f1effde35960cf6ec4bd3c7",
+      "groups": []
+    },
+    {
+      "name": "bolt.new",
+      "source": "https://github.com/stackblitz/bolt.new",
+      "commit": "eda10b121221b30825a4c16eec5da1fd3eb1eb99",
+      "groups": [
+        {
+          "members": [
+            "app/components/workbench/FileBreadcrumb.tsx::handleOutsideClick",
+            "app/components/workbench/PortDropdown.tsx::handleClickOutside"
+          ],
+          "label": "SAME_JOB",
+          "note": "Close a menu on outside click, written separately in two components; a shared hook would do. Small, like the Enter-key handlers in the first set."
+        }
+      ]
+    }
+  ]
+}
