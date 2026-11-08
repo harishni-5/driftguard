@@ -40,7 +40,15 @@ Audit a local folder or a public repo. DriftGuard uses a free LLM for the ambigu
 java -jar target/driftguard.jar audit https://github.com/owner/repo --out report.md
 ```
 
-Useful options: `--out` (report path), `--db` (SQLite file, default `~/.driftguard/driftguard.db`), `--llm` (provider), `--model` (model id).
+Get an HTML report by ending the file name in `.html`:
+
+```bash
+java -jar target/driftguard.jar audit https://github.com/owner/repo --out report.html
+```
+
+The HTML report is one self-contained file. It has a summary, filters by agent, a search box, and links to the exact line on GitHub when the repo came from a GitHub URL. It loads nothing from the network, and all repo text is escaped, so a hostile repo can't run code in it. See [docs/sample-report.html](docs/sample-report.html) for a real one (download it and open it in a browser).
+
+Useful options: `--out` (report path, `.md` or `.html`), `--db` (SQLite file, default `~/.driftguard/driftguard.db`), `--llm` (provider), `--model` (model id).
 
 ## Free LLM options
 
@@ -118,7 +126,7 @@ src/main/java/dev/driftguard/
   agents/     AuditAgent interface, Finding, and one package per agent
   llm/        LlmClient interface, provider selection, OpenAI-format client (Groq, Gemini, Ollama), Claude client
   store/      all SQLite access
-  report/     Markdown output
+  report/     Markdown and HTML output
 src/main/resources/
   helpers/    parser subprocesses: Python (ast) and Node (vendored Babel)
   db/         schema.sql

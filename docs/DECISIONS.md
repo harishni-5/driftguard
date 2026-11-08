@@ -31,7 +31,8 @@ Dead deps are already well served by free tools like deptry and depcheck, so Dea
 | Done | Pattern-Drift quality: held-out eval, prompt v2 (recall 31% → 82%) | Numbers you can defend |
 | Done (static part) | **Spec-Drift**: links, commands, scripts and variables the docs promise but the code doesn't have | Second "wow" feature; easy to demo |
 | Later, optional | Spec-Drift with an LLM: feature claims in prose ("supports PDF export") checked against code. Error-handling style. Embeddings. | Only if time allows |
-| Dec 15-21 | **HTML report**, plus publishing the project on GitHub | Something a recruiter can see |
+| Done | **HTML report** (self-contained, filters, GitHub line links, escapes repo text) and a private GitHub repo | Something a recruiter can see |
+| Next | Public README with results and a viewable sample report, then make the repo public | The page a recruiter actually lands on |
 | Dec 22-28 | **GitHub Action**: comments on a PR when it adds a new competing pattern | Shows real-world engineering |
 | Dec 29-Jan 4 | **Test on 20-30 real repos** with hand-checked results | Real numbers, such as "X% of findings confirmed by hand on 25 repos" |
 | After that, if time allows | Orphan-Code, Q&A, Spring Boot and React web UI | Nice extras; first to cut if you fall behind |

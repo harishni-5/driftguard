@@ -5,6 +5,8 @@ target/
 *.db-wal
 driftguard-report*.md
 report.md
+report.html
+driftguard-report*.html
 __pycache__/
 .idea/
 .vscode/
