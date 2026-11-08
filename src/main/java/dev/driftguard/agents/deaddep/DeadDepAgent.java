@@ -102,9 +102,15 @@ public final class DeadDepAgent implements AuditAgent {
                 .filter(d -> seen.add(d.manifestPath() + "|" + d.name().toLowerCase()))
                 .collect(Collectors.groupingBy(Dependency::manifestPath, LinkedHashMap::new, Collectors.toList()));
 
+        int templateManifests = 0;
         for (Map.Entry<String, List<Dependency>> entry : byManifest.entrySet()) {
             String manifest = entry.getKey();
             List<Dependency> dependencies = entry.getValue();
+            // A template's dependencies serve the project it generates, not this one.
+            if (dev.driftguard.ingest.CodeOrigin.isTemplate(manifest)) {
+                templateManifests++;
+                continue;
+            }
             boolean python = dependencies.get(0).ecosystem() == Ecosystem.PYTHON;
             // A package.json only covers its own folder, which keeps monorepos right. Python is
             // looser: requirements/dev.txt describes code elsewhere, so it covers the whole repo
@@ -116,8 +122,11 @@ public final class DeadDepAgent implements AuditAgent {
             if (python) {
                 boolean freezeLike = looksLikePipFreeze(dependencies);
                 if (freezeLike) {
-                    warnings.add(manifest + " looks like `pip freeze` output (" + dependencies.size()
-                            + " exact pins), so many entries may be transitive deps, not direct ones.");
+                    // Every transitive package is pinned there, so "never imported" says nothing. On the
+                    // final 22-repo test, 0 of 15 such leads were real.
+                    warnings.add("Skipped " + manifest + ": it looks like `pip freeze` output (" + dependencies.size()
+                            + " exact pins), which lists transitive packages, not direct ones.");
+                    continue;
                 }
                 Set<String> unattributed = unattributedPythonImports(index, dependencies);
                 for (Dependency dependency : dependencies) {
@@ -126,13 +135,16 @@ public final class DeadDepAgent implements AuditAgent {
             } else {
                 Map<String, Dependency> declared = dependencies.stream()
                         .collect(Collectors.toMap(Dependency::name, d -> d, (first, second) -> first));
-                String scripts = manifests.scripts().get(manifest);
+                String scripts = workspaceScripts(manifests, manifest);
                 for (Dependency dependency : dependencies) {
                     classifications.add(classifyJs(dependency, index, declared, scripts));
                 }
             }
         }
 
+        if (templateManifests > 0) {
+            warnings.add("Skipped " + templateManifests + " manifest(s) inside template folders: they belong to the projects those templates generate.");
+        }
         return verifyAndReport(context, classifications, warnings);
     }
 
@@ -193,6 +205,7 @@ public final class DeadDepAgent implements AuditAgent {
             Dependency dep, UsageIndex index, Map<String, Dependency> declared, String scripts) {
         String name = dep.name();
         if (index.jsPackageImported(name)) return used(dep);
+        if (KnownPackages.isJsPlatformBinary(name)) return used(dep);
 
         String typesTarget = KnownPackages.jsTypesTarget(name);
         if (typesTarget != null) {
@@ -264,6 +277,22 @@ public final class DeadDepAgent implements AuditAgent {
             }
         }
         return roots;
+    }
+
+    /**
+     * This manifest's scripts, plus those of every package.json below it. A monorepo root often
+     * declares a tool (biome, bunchee) that only the workspace packages' scripts run.
+     */
+    private static String workspaceScripts(ManifestParser.Result manifests, String manifest) {
+        String own = manifests.scripts().getOrDefault(manifest, "");
+        String directory = directoryOf(manifest);
+        StringBuilder all = new StringBuilder(own == null ? "" : own);
+        for (Map.Entry<String, String> other : manifests.scripts().entrySet()) {
+            String path = other.getKey();
+            if (path.equals(manifest) || other.getValue() == null) continue;
+            if (directory.isEmpty() || path.startsWith(directory + "/")) all.append('\n').append(other.getValue());
+        }
+        return all.toString();
     }
 
     private static boolean looksLikePipFreeze(List<Dependency> dependencies) {

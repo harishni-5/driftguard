@@ -171,8 +171,8 @@ class DeadDepPythonTest {
                 .file("main.py", "import pkg0\n")
                 .audit(null);
 
-        assertEquals(29, report.findings().size());
-        assertTrue(report.findings().stream().allMatch(f -> f.decidedBy() == DecidedBy.UNVERIFIED));
+        // Skipped with a warning: on 22 unseen repos, 0 of 15 leads from freeze files were real.
+        assertEquals(0, report.findings().size());
         assertTrue(report.warnings().stream().anyMatch(w -> w.contains("pip freeze")));
     }
 

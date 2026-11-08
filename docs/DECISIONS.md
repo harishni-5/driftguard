@@ -156,10 +156,37 @@ Real examples it found:
 What this means:
 - **The earlier static numbers didn't generalize.** 40/41 (docs vs code) and 21/22 (unused deps) came from 5-6 repos without templates or generated code. On 22 varied repos, static likely issues are right a bit over half the time. The LLM-checked duplicate finder (82/82 on held-out) is still the strongest result.
 - **One cause dominates: code the project didn't write by hand.** Template projects (create-llama: 30 doc findings and 8 dependencies; gpt-pilot: 18 dependencies; llamacoder preview kits: 9) and generated bundles (mem0's 7 plugin copies built from `integrations/agent-plugin-core`: about 20 of 50 sampled copies).
-- **Other causes:** docs-site links to built `.html` pages (aider: 9); build outputs like `dist/cli.mjs`; tutorials that say "save this as x.py" first; `bun run file.ts` misread as a script (parser bug); tools run by command name (`buf`, `vsce`, vitest coverage, biome); platform-specific binaries; lockfile-style requirements read as manifests; `pip freeze` files full of transitive dependencies (all DocsGPT review leads); `urllib.parse` counted as an HTTP client (catalog bug); one database adapter per backend reported as competing layers.
-- **Next fix, in order of payoff:** recognize template and generated folders; skip built-page links and `dist/` paths; treat `bun run <file>` as a file; drop database layers and print-vs-logging from likely issues; treat freeze files like lockfiles. **Re-measure on a fresh set of repos.** Quoting improved numbers from these 22 would be tuning on the test.
+- **Other causes:** docs-site links to built `.html` pages (aider: 9); build outputs like `dist/cli.mjs`; tutorials that say "save this as x.py" first; `bun run file.ts` misread as a script (parser bug); tools run by command name (`buf`, `vsce`, vitest coverage, biome); platform-specific binaries; lockfile-style requirements read as manifests; `pip freeze` files full of transitive dependencies (all DocsGPT review leads); one database adapter per backend reported as competing layers.
+- **Next fix, in order of payoff:** recognize template and generated folders; skip built-page links and `dist/` paths; treat `bun run <file>` as a file; drop database layers and print-vs-logging from likely issues; treat freeze files like lockfiles. (An earlier note here blamed `urllib.parse` for a false HTTP-client finding. That was wrong: the file also imported `urllib3`, so the finding was correct.) **Re-measure on a fresh set of repos.** Quoting improved numbers from these 22 would be tuning on the test.
 
 **Resume-safe claims after this test:** the LLM duplicate check (82% precision and recall on held-out data, recall 31% → 82% from a prompt rewrite); competing HTTP/icon/date libraries at 94% (17/18) on 22 unseen repos; "measured on 22 open-source repos, with 668 static findings and a published per-finding audit". Don't quote 40/41 or 21/22 as general precision anymore.
+
+**Fixes and re-measurement on 17 fresh repos (2026-11-08):** after the 22-repo test:
+- Template folders (`templates/`, `scaffold`, `preview-kits`, `*-template.md`, cookiecutter dirs) are skipped by all three agents, through a shared `CodeOrigin` class.
+- Files kept as 3+ identical copies of 30+ lines are treated as built or synced copies: one "copied-file" lead instead of a copied-code finding per function.
+- Dead-Dep: `pip freeze` files and hash-pinned or `*-lock.txt` requirements are skipped; more tools are known by command name; vitest coverage and test environments, changelog presets and protoc plugins count as used when their host tool is declared; platform-specific binaries are ignored; a monorepo root's tools count as used when any workspace script runs them.
+- Pattern-Drift: database layers and print vs logging are leads, not likely issues.
+- Spec-Drift: `.html` links count when the `.md` page exists; `dist/`, `build/` and `out/` paths are skipped; `bun run file.ts` is a file; files the doc says to create ("Save this as…", or a code block whose first line names the file) are skipped; a real `examples/` folder is no longer mistaken for a placeholder.
+
+Then 17 repos never used before were audited with no further changes: pydantic-ai, openai-agents-python, smolagents, letta, skyvern, assistant-ui, open-lovable, bolt.diy, stagehand, Archon, markitdown, graphiti, cognee, MCP servers, agno, open_deep_research, CopilotKit. Verdicts are in [eval/fresh-check.md](../eval/fresh-check.md).
+
+| Likely issues | 22 repos (before) | 17 fresh repos (after) |
+|---|---:|---:|
+| Unused dependencies | 61% | **80%** (48/60 sampled of 852; product code 11/13, example apps 37/47) |
+| Copied code | 56% | **74%** (37/50 sampled of 1,031) |
+| Competing libraries | 58% | 62% (15/24; HTTP/icons/dates in product code 15/15; validation 0/5; example folders 0/4) |
+| Docs vs code | 44% | **27%** (17/62, 2 unsure) |
+| Review leads | 14% | 14% (4/29) |
+
+What this means:
+- **The fixes generalized for dependencies and copied code.** Those are now solid enough to quote.
+- **Docs vs code didn't generalize.** New conventions appeared: translated docs sites whose framework resolves links to the English pages (openai-agents: 30 false alarms), example link syntax inside inline code, and docs describing other projects or SDKs. Next step there: ignore links inside inline code, understand i18n docs layouts, and consider reporting non-README link findings as leads.
+- **Example apps dominate dependency findings in big monorepos** (665 of 852). They're mostly literally true but low value. Next step: report example-folder findings as leads or summarize them per folder.
+- **Validation libraries** should become leads, like database layers (0/5 across both sets).
+- **Performance:** CopilotKit (hundreds of package.json files) took 20 minutes. Dead-Dep builds a usage index per manifest scope, which needs caching.
+- Small bugs found: `ag-ui-protocol` imports as `ag_ui` (import-name table); a decorator and its own inner wrapper grouped as similar functions.
+
+**Resume-safe claims now:** LLM duplicate check 82% precision and recall on held-out data; on 17 fresh repos after one round of fixes, unused dependencies 80%, copied code 74%, and competing HTTP/icon/date libraries 15/15 in product code; "about 600 findings hand-checked across 39 open-source repos (sampled from about 2,600 likely issues), with a public per-finding audit".
 
 ## What hasn't been verified
 

@@ -62,7 +62,13 @@ final class KnownPackages {
             Map.entry("electron-builder", List.of("electron-builder")),
             Map.entry("dotenv-cli", List.of("dotenv")),
             Map.entry("c8", List.of("c8")),
-            Map.entry("nyc", List.of("nyc")));
+            Map.entry("nyc", List.of("nyc")),
+            // Added after the final 22-repo test, where these were run by command name.
+            Map.entry("@bufbuild/buf", List.of("buf")),
+            Map.entry("@vscode/vsce", List.of("vsce")),
+            Map.entry("vsce", List.of("vsce")),
+            Map.entry("@microsoft/tui-test", List.of("tui-test")),
+            Map.entry("@langchain/langgraph-cli", List.of("langgraphjs", "langgraph")));
 
     /** JS packages a build tool picks up because certain files exist, with no import needed. */
     private static final Map<String, Pattern> JS_IMPLIED_BY_FILES = Map.ofEntries(
@@ -88,10 +94,23 @@ final class KnownPackages {
             Map.entry("@babel/core", Pattern.compile("(^|.*/)(babel\\.config\\.[a-z]+|\\.babelrc.*)$")));
 
     /** A JS package that the named package needs alongside it without any import of its own. */
-    private static final Map<String, List<String>> JS_REQUIRED_BY = Map.of(
-            "react-dom", List.of("next", "gatsby", "react-scripts", "@remix-run/react", "react-email"),
-            "react", List.of("next", "gatsby", "react-scripts", "react-dom", "react-native", "expo"),
-            "react-native", List.of("expo"));
+    private static final Map<String, List<String>> JS_REQUIRED_BY = Map.ofEntries(
+            Map.entry("react-dom", List.of("next", "gatsby", "react-scripts", "@remix-run/react", "react-email")),
+            Map.entry("react", List.of("next", "gatsby", "react-scripts", "react-dom", "react-native", "expo")),
+            Map.entry("react-native", List.of("expo")),
+            // Picked up by convention: a coverage provider or test environment vitest loads by name,
+            // a changelog preset release tools load by name, and a protoc plugin buf or protoc runs.
+            Map.entry("@vitest/coverage-v8", List.of("vitest")),
+            Map.entry("@vitest/coverage-istanbul", List.of("vitest")),
+            Map.entry("@edge-runtime/vm", List.of("vitest")),
+            Map.entry("conventional-changelog-conventionalcommits", List.of("semantic-release", "standard-version",
+                    "release-please", "conventional-changelog-cli", "@semantic-release/commit-analyzer", "release-it")),
+            Map.entry("conventional-changelog-angular", List.of("semantic-release", "standard-version", "conventional-changelog-cli")),
+            Map.entry("protoc-gen-ts", List.of("@bufbuild/buf", "grpc-tools", "protoc", "@protobuf-ts/plugin")),
+            Map.entry("ts-proto", List.of("@bufbuild/buf", "grpc-tools", "protoc")));
+
+    /** Native builds for one platform, declared so the right binary installs. Never imported by name. */
+    private static final Pattern JS_PLATFORM_BINARY = Pattern.compile(".*-(linux|darwin|win32|freebsd|android)-(x64|arm64|ia32|arm)(-[a-z0-9]+)?$");
 
     private static final Pattern JS_TOOL_FAMILY = Pattern.compile(
             "^(eslint-|@eslint/|@typescript-eslint/|prettier-|@trivago/prettier|babel-|@babel/|postcss-|stylelint"
@@ -119,6 +138,10 @@ final class KnownPackages {
             "export", "run", "exec", "install", "add", "build", "dev", "start", "lint", "tsc", "cross-env");
 
     private KnownPackages() {}
+
+    static boolean isJsPlatformBinary(String packageName) {
+        return JS_PLATFORM_BINARY.matcher(packageName).matches();
+    }
 
     static boolean isJsIndirect(String packageName) {
         return JS_INDIRECT.contains(packageName);

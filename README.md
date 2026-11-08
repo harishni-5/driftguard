@@ -26,19 +26,19 @@ Every number below comes from hand-checking findings on public repos the tool wa
 | Effect of rewriting the prompt | Recall went from **31% to 82%**, and precision went up too |
 | Cost with Groq's free tier | About 1-2k tokens for a small repo, **$0** |
 
-**Static "likely issues" on 22 varied AI-era repos** (open-canvas, gpt-pilot, cline, mem0, aider, DocsGPT and 16 more; 668 findings):
+**Static "likely issues", hand-checked on two separate sets of AI-era repos.** The first set (22 repos) found the main false-alarm causes; after fixing them, a second set of 17 repos never used before measured the result:
 
-| Check | Real / judged | Precision |
+| Check | First set: 22 repos | After fixes: 17 fresh repos |
 |---|---:|---:|
-| Competing libraries: HTTP clients, icon and date libraries | 17 / 18 | **94%** |
-| Competing libraries: all kinds (logging and database layers are weaker) | 21 / 36 | 58% |
-| Unused dependencies | 95 / 156 | 61% |
-| Copied code (random sample of 50 of 378) | 28 / 50 | 56% |
-| Docs vs code: broken links, missing files and scripts | 39 / 89 | 44% |
+| Unused dependencies | 61% (95/156) | **80%** (48/60 sampled) |
+| Copied code | 56% (28/50 sampled) | **74%** (37/50 sampled) |
+| Competing HTTP, icon and date libraries in product code | 94% (17/18) | **100%** (15/15) |
+| Competing libraries, all kinds | 58% (21/36) | 62% (15/24) |
+| Docs vs code: broken links, missing files and scripts | 44% (39/89) | 27% (17/62) |
 
-Most false alarms come from code the project didn't write by hand: **template projects** (create-llama, gpt-pilot, llamacoder), **generated bundles** (mem0's plugin copies), docs-site links, and build outputs. Earlier tests on smaller repo sets scored much higher (40 of 41 for docs vs code), because those repos happened to have no templates. Recognizing template and generated folders is the next fix, and it will be measured on a fresh set of repos.
+The fixes (recognizing template folders, generated file copies, `pip freeze` files, more command-line tools, docs-site links and build outputs) worked for dependencies and copied code. **Docs vs code is the weak spot**: every new family of repos brings its own doc conventions. On the fresh set, translated docs-site pages in one repo caused 30 of the 45 false alarms. Treat its findings as leads until it's measured better. Every verdict, with a reason, is in [eval/final-check.md](eval/final-check.md) and [eval/fresh-check.md](eval/fresh-check.md).
 
-"Needs your review" items are leads: 4 of 28 sampled turned out to be real problems.
+"Needs your review" items are leads: about 1 in 7 sampled turned out to be a real problem (4/28 and 4/29 on the two sets).
 
 ## Quick start
 
@@ -130,12 +130,12 @@ The audited repo is treated as untrusted:
 ./mvnw test
 ```
 
-112 tests, run on Linux and Windows in CI. They need Python and Node on your PATH but no API key: LLM clients are tested against a local fake server.
+121 tests, run on Linux and Windows in CI. They need Python and Node on your PATH but no API key: LLM clients are tested against a local fake server.
 
 ## Status and limits
 
 Working: ingestion, the three agents, Markdown, HTML and JSON reports, the pull request Action, and the eval harness, for Python and JS/TS.
 
-Known limits: template and generated folders cause most false alarms (see Results); functions that do the same job in very different words are missed; Spec-Drift checks concrete things like links and commands, not prose claims like "supports PDF export"; Java repos aren't audited yet. The full list is in [docs/how-it-works.md](docs/how-it-works.md#known-limits).
+Known limits: docs vs code is the least reliable check (see Results); example apps produce most unused-dependency findings in big monorepos; a very large monorepo (CopilotKit) took 20 minutes; functions that do the same job in very different words are missed; Spec-Drift checks concrete things like links and commands, not prose claims like "supports PDF export"; Java repos aren't audited yet. The full list is in [docs/how-it-works.md](docs/how-it-works.md#known-limits).
 
 Built with Java 21, picocli, SQLite and Jackson.

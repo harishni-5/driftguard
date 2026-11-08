@@ -118,6 +118,8 @@ public final class SpecDriftAgent implements AuditAgent {
             if (text == null) continue;
             if (DOC_FILE.matcher(file.path()).matches()) {
                 if (HISTORY_DOC.matcher(file.path()).matches()) continue;
+                // A template's docs describe the project it generates, where the linked files will exist.
+                if (dev.driftguard.ingest.CodeOrigin.isTemplate(file.path())) continue;
                 docs++;
                 claims.addAll(DocClaims.extract(file.path(), text, repoName(snapshot.source())));
             } else if (!TEXT_DOC.matcher(file.path()).matches()) {
@@ -356,9 +358,14 @@ public final class SpecDriftAgent implements AuditAgent {
         List<Finding> paths(List<Claim> claims, Map<String, Integer> stats) {
             List<Finding> findings = new ArrayList<>();
             Set<String> seen = new HashSet<>();
+            Set<String> createdByDoc = new HashSet<>();
+            for (Claim claim : claims) {
+                if (claim.type() == Type.CREATED_FILE) createdByDoc.add(claim.doc() + "|" + baseName(claim.value()));
+            }
             int checked = 0;
             for (Claim claim : claims) {
                 if (claim.type() != Type.LINK && claim.type() != Type.COMMAND_FILE) continue;
+                if (claim.type() == Type.COMMAND_FILE && createdByDoc.contains(claim.doc() + "|" + baseName(claim.value()))) continue;
                 List<String> candidates = claim.type() == Type.LINK ? linkTargets(claim) : commandTargets(claim);
                 if (candidates.isEmpty()) continue;
                 checked++;
@@ -394,7 +401,17 @@ public final class SpecDriftAgent implements AuditAgent {
             boolean readme = claim.doc().toLowerCase(Locale.ROOT).matches("(.*/)?readme[^/]*\\.md");
             if (target.startsWith("/")) return readme ? judgeable(List.of(normalize("", target.substring(1)))) : List.of();
             String docDir = claim.doc().contains("/") ? claim.doc().substring(0, claim.doc().lastIndexOf('/')) : "";
-            return judgeable(List.of(normalize(docDir, target)));
+            String resolved = normalize(docDir, target);
+            // Docs sites link to built pages: page.html is page.md (or .mdx) in the repo.
+            if (resolved.endsWith(".html")) {
+                String stem = resolved.substring(0, resolved.length() - 5);
+                return judgeable(List.of(resolved, stem + ".md", stem + ".mdx", stem + "/index.md"));
+            }
+            return judgeable(List.of(resolved));
+        }
+
+        private static String baseName(String path) {
+            return path.substring(path.lastIndexOf('/') + 1);
         }
 
         /** Drops paths that lead outside the repo, such as GitHub's ../../actions badge links. */
@@ -405,7 +422,10 @@ public final class SpecDriftAgent implements AuditAgent {
         private List<String> commandTargets(Claim claim) {
             String target = claim.value();
             if (target.startsWith("/") || target.startsWith("~") || target.contains("$") || target.contains("<")) return List.of();
-            if (target.matches("(?i)(path/to|your|my|example)[^/]*/.*")) return List.of();
+            // Placeholders like path/to/x.py or your-project/run.sh; a real examples/ folder is still checked.
+            if (target.matches("(?i)(path/to/|your[-_]?|my[-_]).*")) return List.of();
+            // Build output: it exists once the doc's build step has run.
+            if (target.matches("(?:\\./)?(?:.*/)?(dist|build|out|\\.next|target)/.*")) return List.of();
             String base = claim.base();
             if (base.startsWith("/")) return List.of(); // the doc cd'd outside the repo
             if (!base.isEmpty() && !Files.isDirectory(root.resolve(base), LinkOption.NOFOLLOW_LINKS)) {

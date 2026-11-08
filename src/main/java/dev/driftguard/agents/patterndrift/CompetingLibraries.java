@@ -19,6 +19,10 @@ import java.util.Set;
 /** Finds projects using more than one library for the same job. Fully static. */
 final class CompetingLibraries {
 
+    /** Concerns whose findings are reported as leads, not likely issues (see the final-test numbers). */
+    private static final java.util.Set<String> LEAD_CONCERNS = java.util.Set.of("database", "logging");
+
+
     private static final int CASUAL_MIN_FILES = 2;
     private static final int SEVERE_APPROACH_COUNT = 3;
 
@@ -105,13 +109,16 @@ final class CompetingLibraries {
                 : top.getKey().name() + " is the most used, so consider moving the other code to it, unless there's a reason for the split.";
         Severity severity = names.size() >= SEVERE_APPROACH_COUNT ? Severity.HIGH : Severity.MEDIUM;
         boolean casualInvolved = ranked.stream().anyMatch(entry -> entry.getKey().casual());
+        // Measured on 22 unseen repos: database layers were 0/7 real (one adapter per backend is normal)
+        // and print vs logging 4/10 (CLIs print on purpose). Those stay leads; the rest stay likely issues.
+        boolean lead = LEAD_CONCERNS.contains(concern.id()) || casualInvolved;
 
         return new Finding(
                 PatternDriftAgent.NAME,
                 "competing-libraries",
                 casualInvolved ? Severity.LOW : severity,
                 casualInvolved ? Confidence.MEDIUM : Confidence.HIGH,
-                DecidedBy.STATIC,
+                lead ? DecidedBy.UNVERIFIED : DecidedBy.STATIC,
                 names.size() + " " + concern.title() + " in " + where + ": " + String.join(", ", names),
                 "The same job is done " + names.size() + " different ways in non-test code, so the next person or AI session has no clear pattern to follow.",
                 outlier.file(),

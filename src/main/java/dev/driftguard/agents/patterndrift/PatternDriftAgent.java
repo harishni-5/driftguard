@@ -143,6 +143,13 @@ public final class PatternDriftAgent implements AuditAgent {
             warnings.add("Pattern-Drift found " + copies.size() + " groups of copied code and reports the largest " + MAX_REPORTED_COPIES + ".");
         }
 
+        // Whole files kept as identical copies (built or synced from one source) are one lead each,
+        // instead of a copied-code finding for every function inside them.
+        for (List<String> identical : areas.origin().copyGroups()) {
+            if (!identical.stream().allMatch(CodeAreas::isProductPath)) continue;
+            findings.add(toFileCopyFinding(identical));
+        }
+
         List<Group> groups = similarity.similar();
         List<Group> reported = reportEverything ? groups : groups.subList(0, Math.min(MAX_LLM_GROUPS, groups.size()));
         if (groups.size() > reported.size()) {
@@ -228,6 +235,17 @@ public final class PatternDriftAgent implements AuditAgent {
     /** Code can go to a cloud LLM, so long key-like strings are masked first. */
     static String redact(String line) {
         return SECRET_LIKE.matcher(line).replaceAll("\"<redacted>\"");
+    }
+
+    private static Finding toFileCopyFinding(List<String> copies) {
+        String name = copies.get(0).substring(copies.get(0).lastIndexOf('/') + 1);
+        return new Finding(NAME, "copied-file", Severity.LOW, Confidence.MEDIUM, DecidedBy.UNVERIFIED,
+                "Same file kept in " + copies.size() + " identical copies: " + name,
+                "These files are identical. That usually means a build or sync step copies them from one source,"
+                        + " which is fine; if people edit them by hand, a fix to one will miss the others.",
+                copies.get(0), 1, copies.stream().limit(8).map(p -> p + ":1").toList(),
+                "If a script generates these, nothing to do. Otherwise keep one copy and share it.",
+                fingerprint("copied-file|" + String.join("|", copies)));
     }
 
     /** Identical bodies are a fact, so this needs no LLM. Whether to merge them is still a judgment call. */

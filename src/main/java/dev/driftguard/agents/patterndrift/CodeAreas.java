@@ -29,8 +29,10 @@ final class CodeAreas {
 
     private final Set<String> projectDirs = new HashSet<>();
     private final Set<String> thirdParty = new HashSet<>();
+    private final dev.driftguard.ingest.CodeOrigin origin;
 
     CodeAreas(RepoSnapshot snapshot) {
+        origin = new dev.driftguard.ingest.CodeOrigin(snapshot.files());
         Set<String> paths = new HashSet<>();
         for (SourceFile file : snapshot.files()) paths.add(file.path());
         for (SourceFile file : snapshot.files()) {
@@ -55,7 +57,11 @@ final class CodeAreas {
 
     /** Product code the project wrote itself: not tests or samples, and not vendored or bundled files. */
     boolean isProductCode(String path) {
-        return isProductPath(path) && !thirdParty.contains(path);
+        return isProductPath(path) && !thirdParty.contains(path) && origin.isHandWritten(path);
+    }
+
+    dev.driftguard.ingest.CodeOrigin origin() {
+        return origin;
     }
 
     static boolean isProductPath(String path) {

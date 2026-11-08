@@ -97,6 +97,12 @@ public final class ManifestParser {
         // A compiled lockfile lists every transitive package. Only its source file says what was
         // actually asked for, so an unused entry here says nothing about the project.
         String head = text.substring(0, Math.min(text.length(), 500));
+        // Hash-pinned files and *-lock.txt are lockfiles too, even without a compiler header.
+        String fileName = path.substring(path.lastIndexOf('/') + 1).toLowerCase(Locale.ROOT);
+        if (text.contains("--hash=") || fileName.matches(".*[-_.]lock(ed)?[-_.].*|.*[-_.]lock(ed)?\\.txt")) {
+            warnings.add("Skipped " + path + ": a hash-pinned lockfile, not a list of direct dependencies.");
+            return;
+        }
         if (head.contains("pip-compile") || head.contains("uv pip compile")) {
             warnings.add("Skipped " + path + ": generated lockfile, not a list of direct dependencies.");
             return;

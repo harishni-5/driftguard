@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
  */
 final class DocClaims {
 
-    enum Type { ENV_VAR, SCRIPT, LINK, COMMAND_FILE }
+    enum Type { ENV_VAR, SCRIPT, LINK, COMMAND_FILE, CREATED_FILE }
 
     /**
      * @param value  the variable, script name or path as written
@@ -41,7 +41,7 @@ final class DocClaims {
     private static final Pattern CONTAINER_ENV = Pattern.compile("\\bdocker\\s+(run|create)\\b|(^|\\s)-e\\s+[\"']?[A-Z]");
     private static final Pattern PLACEHOLDER = Pattern.compile("^(YOUR|MY|EXAMPLE|SOME|THE)_.*|.*_(YOUR|HERE)(_.*)?$");
 
-    private static final Pattern RUN_SCRIPT = Pattern.compile("\\b(npm|pnpm|yarn|bun)\\s+run\\s+([A-Za-z0-9][\\w:.-]*)");
+    private static final Pattern RUN_SCRIPT = Pattern.compile("\\b(npm|pnpm|yarn|bun)\\s+run\\s+([A-Za-z0-9.][\\w:./-]*)");
     private static final Pattern NPM_SHORTCUT = Pattern.compile("\\bnpm\\s+(start|test)\\b");
     private static final Pattern BARE_SCRIPT = Pattern.compile("\\b(pnpm|yarn|bun)\\s+([A-Za-z][\\w:.-]*)(?=\\s|$)");
     private static final Set<String> MANAGER_COMMANDS = Set.of(
@@ -58,6 +58,13 @@ final class DocClaims {
     private static final Pattern RUN_FILE = Pattern.compile(
             "(?:^|[\\s;&|])(?:python3?|py|node|bun|deno run|tsx|ts-node|bash|sh|zsh)\\s+(?:-[\\w-]+\\s+)*([\\w./-]+\\.(?:py|js|mjs|cjs|ts|sh))\\b");
     private static final Pattern DOT_SLASH = Pattern.compile("(?:^|[\\s;&|])\\./([\\w./-]+\\.(?:sh|py))\\b");
+    /** "Save this as `x.py`", "create a file named x.sh": the reader makes this file, so it won't be in the repo. */
+    private static final Pattern CREATES_FILE = Pattern.compile(
+            "(?i)\\b(save|create|copy|put|write|add|make)\\b[^.\\n]{0,60}?\\b(as|named|called|into|in|to|file)\\s+(?:<[^>]+>)*[`*\"']*([\\w./-]+\\.[a-z0-9]{1,5})\\b");
+    /** First line of a code block naming its file, like "# agent_memory.sh" or "// server.ts". */
+    private static final Pattern FILE_COMMENT = Pattern.compile("^\\s*(?:#|//|--)\\s*([\\w./-]+\\.[a-z0-9]{1,5})\\b");
+    private static final Pattern FENCE_TITLE = Pattern.compile("(?:title|filename|file)=[\"']?([\\w./-]+\\.[a-z0-9]{1,5})");
+    private static final Pattern RUNNABLE_FILE = Pattern.compile(".*(/|\\.(ts|tsx|js|jsx|mjs|cjs|mts|cts|py)$).*");
     private static final Pattern CD = Pattern.compile("(?:^|[\\s;&|])cd\\s+([\\w./-]+)");
     private static final Pattern CLONE = Pattern.compile("\\bgit\\s+clone\\b.*?(?:https?://|git@)\\S*?/([\\w.-]+?)(?:\\.git)?(?:\\s|$)");
 
@@ -77,6 +84,7 @@ final class DocClaims {
         boolean envTable = false;
         String base = "";
         Set<String> blockReferences = new java.util.HashSet<>();
+        boolean firstLineOfBlock = false;
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i];
             int lineNo = i + 1;
@@ -87,6 +95,9 @@ final class DocClaims {
                     inFence = true;
                     fenceMarker = marker.substring(0, 3);
                     shellBlock = SHELL_LANGS.contains(fence.group(2).toLowerCase(Locale.ROOT));
+                    Matcher title = FENCE_TITLE.matcher(line);
+                    if (title.find()) claims.add(new Claim(Type.CREATED_FILE, title.group(1), doc, lineNo, line.trim(), "", null));
+                    firstLineOfBlock = true;
                     // base carries over: readers follow a doc's steps in order, so a cd in step 2 still holds in step 3.
                     continue;
                 }
@@ -96,6 +107,11 @@ final class DocClaims {
                 }
             }
             if (inFence) {
+                if (firstLineOfBlock) {
+                    firstLineOfBlock = false;
+                    Matcher named = FILE_COMMENT.matcher(line);
+                    if (named.find()) claims.add(new Claim(Type.CREATED_FILE, named.group(1), doc, lineNo, line.trim(), "", null));
+                }
                 if (shellBlock) {
                     base = shellLine(doc, lineNo, line, base, claims);
                     Matcher clone = CLONE.matcher(line);
@@ -130,13 +146,18 @@ final class DocClaims {
         }
 
         Matcher run = RUN_SCRIPT.matcher(line);
-        while (run.find()) claims.add(new Claim(Type.SCRIPT, run.group(2), doc, lineNo, trimmed, base, run.group(1) + " run"));
+        while (run.find()) {
+            // `bun run src/index.ts` runs a file, not a package.json script.
+            Type type = RUNNABLE_FILE.matcher(run.group(2)).matches() ? Type.COMMAND_FILE : Type.SCRIPT;
+            claims.add(new Claim(type, run.group(2), doc, lineNo, trimmed, base, run.group(1) + " run"));
+        }
         Matcher shortcut = NPM_SHORTCUT.matcher(line);
         while (shortcut.find()) claims.add(new Claim(Type.SCRIPT, shortcut.group(1), doc, lineNo, trimmed, base, "npm"));
         Matcher bare = BARE_SCRIPT.matcher(line);
         while (bare.find()) {
             if (MANAGER_COMMANDS.contains(bare.group(2))) continue;
             if (bare.group(1).equals("bun") && BUN_BUILTINS.contains(bare.group(2))) continue;
+            if (RUNNABLE_FILE.matcher(bare.group(2)).matches()) continue; // bun x.ts runs a file, handled below
             claims.add(new Claim(Type.SCRIPT, bare.group(2), doc, lineNo, trimmed, base, bare.group(1)));
         }
 
@@ -174,6 +195,8 @@ final class DocClaims {
     }
 
     private static void proseLine(String doc, int lineNo, String line, List<Claim> claims, boolean envTable) {
+        Matcher creates = CREATES_FILE.matcher(line);
+        while (creates.find()) claims.add(new Claim(Type.CREATED_FILE, creates.group(3), doc, lineNo, line.trim(), "", null));
         Matcher link = MD_LINK.matcher(line);
         while (link.find()) claims.add(new Claim(Type.LINK, link.group(1), doc, lineNo, line.trim(), "", null));
         Matcher ref = REF_LINK.matcher(line);
