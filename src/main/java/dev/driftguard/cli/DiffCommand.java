@@ -27,6 +27,9 @@ final class DiffCommand implements Callable<Integer> {
     @Option(names = "--repo-url", description = "https://github.com/owner/repo, so findings link to the head commit's lines.")
     private String repoUrl;
 
+    @Option(names = "--link-commit", description = "Commit to link lines to, such as a PR's head when the audit ran on a temporary merge commit.")
+    private String linkCommit;
+
     @Option(names = "--fail-on", description = "none, likely or any: exit with code 2 when the PR adds findings of that kind. Default: ${DEFAULT-VALUE}.")
     private String failOn = "none";
 
@@ -37,7 +40,7 @@ final class DiffCommand implements Callable<Integer> {
             JsonReport.Audit before = JsonReport.read(base);
             JsonReport.Audit after = JsonReport.read(head);
             PrComment.Diff diff = PrComment.diff(before, after);
-            Files.writeString(out, PrComment.render(diff, before, after, repoUrl));
+            Files.writeString(out, PrComment.render(diff, before, after, repoUrl, linkCommit));
             System.out.printf("New likely issues: %d. New leads: %d. Fixed: %d.%nComment: %s%n",
                     diff.newLikely().size(), diff.newLeads().size(), diff.fixed().size(), out.toAbsolutePath());
             return diff.shouldFail(threshold) ? 2 : 0;

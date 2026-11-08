@@ -57,6 +57,16 @@ class PrCommentTest {
     }
 
     @Test
+    void linksToThePrHeadWhenTheAuditRanOnAMergeCommit() {
+        Finding added = finding("Broken link: new.md", DecidedBy.STATIC, "ccc");
+        PrComment.Diff diff = PrComment.diff(audit("1111111"), audit("mmmmmmm", added));
+        String comment = PrComment.render(diff, audit("1111111"), audit("mmmmmmm"), "https://github.com/me/app", "abcdef1234");
+
+        assertTrue(comment.contains("/blob/abcdef1234/README.md#L3"), comment);
+        assertTrue(comment.contains("head `abcdef1`"), comment);
+    }
+
+    @Test
     void saysSoWhenNothingChanged() {
         Finding same = finding("Broken link: old.md", DecidedBy.STATIC, "aaa");
         PrComment.Diff diff = PrComment.diff(audit("1", same), audit("2", same));
