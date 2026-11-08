@@ -342,6 +342,19 @@ class PatternDriftTest {
         assertTrue(ofCategory(report, "similar-functions").isEmpty(), "not reported twice");
     }
 
+    /** Found by auditing DriftGuard itself: its vendored Babel parser was reported as drift. */
+    @Test
+    void vendoredAndBundledFilesAreNotTheProjectsDrift() throws Exception {
+        String hugeBundle = "export async function bundledTotal(account) {\n" + BODY + "// filler\n".repeat(10_001);
+        AuditAgent.Report report = audit(new TestRepo(dir)
+                .file("a.js", "export async function cartTotal(account) {\n" + BODY)
+                .file("lib/parser.mjs", "export async function vendoredTotal(account) {\n" + BODY)
+                .file("lib/parser.LICENSE", "MIT License\n")
+                .file("dist-like/app.bundle-ish.js", hugeBundle), null);
+
+        assertTrue(ofCategory(report, "copied-code").isEmpty(), ofCategory(report, "copied-code").toString());
+    }
+
     @Test
     void docstringsAndCommentsDoNotMakeFunctionsLookAlike() throws Exception {
         String docs = "    \"\"\"Render a template by name with the given context and return the resulting text for the client.\n"
