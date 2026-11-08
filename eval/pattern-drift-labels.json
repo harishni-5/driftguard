@@ -1,0 +1,491 @@
+{
+  "description": "Hand labels for Pattern-Drift similar-function groups. Labeled by reading the code, before any LLM saw the groups.",
+  "repos": [
+    {
+      "name": "chatbot-ui",
+      "source": "https://github.com/mckaywrigley/chatbot-ui",
+      "commit": "81328b61d2a4ab597a7a057be70e785cf756d9f8",
+      "groups": [
+        {
+          "members": [
+            "db/presets.ts::getPresetWorkspacesByPresetId",
+            "db/presets.ts::getPresetWorkspacesByWorkspaceId"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "One query per direction of a many-to-many join, repeated per entity. Generated-looking data layer, same shape on purpose."
+        },
+        {
+          "members": [
+            "db/files.ts::getFileWorkspacesByFileId",
+            "db/files.ts::getFileWorkspacesByWorkspaceId"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Same per-entity join query pattern as #1."
+        },
+        {
+          "members": [
+            "db/tools.ts::getToolWorkspacesByToolId",
+            "db/tools.ts::getToolWorkspacesByWorkspaceId"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Same per-entity join query pattern as #1."
+        },
+        {
+          "members": [
+            "db/prompts.ts::getPromptWorkspacesByPromptId",
+            "db/prompts.ts::getPromptWorkspacesByWorkspaceId"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Same per-entity join query pattern as #1."
+        },
+        {
+          "members": [
+            "db/models.ts::getModelWorkspacesByModelId",
+            "db/models.ts::getModelWorkspacesByWorkspaceId"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Same per-entity join query pattern as #1."
+        },
+        {
+          "members": [
+            "db/collection-files.ts::getCollectionFilesByCollectionId",
+            "db/collections.ts::getCollectionWorkspacesByCollectionId",
+            "db/collections.ts::getCollectionWorkspacesByWorkspaceId"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Per-entity join queries; collection files and collection workspaces are different relations."
+        },
+        {
+          "members": [
+            "db/assistants.ts::getAssistantWorkspacesByAssistantId",
+            "db/assistants.ts::getAssistantWorkspacesByWorkspaceId"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Same per-entity join query pattern as #1."
+        },
+        {
+          "members": [
+            "db/storage/assistant-images.ts::getAssistantImageFromStorage",
+            "db/storage/files.ts::getFileFromStorage",
+            "db/storage/message-images.ts::getMessageImageFromStorage",
+            "db/storage/workspace-images.ts::getWorkspaceImageFromStorage"
+          ],
+          "label": "SAME_JOB",
+          "note": "All create a signed URL for a storage path; only the bucket differs. Error handling drifted: two swallow errors with try/catch, two throw."
+        },
+        {
+          "members": [
+            "components/chat/assistant-picker.tsx::AssistantPicker.getKeyDownHandler",
+            "components/chat/file-picker.tsx::FilePicker.getKeyDownHandler",
+            "components/chat/prompt-picker.tsx::PromptPicker.getKeyDownHandler",
+            "components/chat/tool-picker.tsx::ToolPicker.getKeyDownHandler"
+          ],
+          "label": "SAME_JOB",
+          "note": "The same keyboard-navigation handler copied into four pickers; one shared hook would do."
+        },
+        {
+          "members": [
+            "components/setup/step-container.tsx::StepContainer.handleKeyDown",
+            "components/sidebar/items/all/sidebar-create-item.tsx::SidebarCreateItem.handleKeyDown",
+            "components/sidebar/items/all/sidebar-delete-item.tsx::SidebarDeleteItem.handleKeyDown",
+            "components/sidebar/items/all/sidebar-display-item.tsx::SidebarItem.handleKeyDown",
+            "components/sidebar/items/chat/delete-chat.tsx::DeleteChat.handleKeyDown",
+            "components/utility/import.tsx::Import.handleKeyDown"
+          ],
+          "label": "SAME_JOB",
+          "note": "Six versions of 'Enter clicks the button', with inconsistent shift-key and propagation handling. Small, but the same job."
+        },
+        {
+          "members": [
+            "db/storage/assistant-images.ts::uploadAssistantImage",
+            "db/storage/message-images.ts::uploadMessageImage",
+            "db/storage/profile-images.ts::uploadProfileImage",
+            "db/storage/workspace-images.ts::uploadWorkspaceImage"
+          ],
+          "label": "SAME_JOB",
+          "note": "Upload an image to a bucket, replacing the old one. Assistant and workspace versions are near copies; profile and message differ slightly."
+        },
+        {
+          "members": [
+            "components/utility/announcements.tsx::Announcements.markAllAsRead",
+            "components/utility/announcements.tsx::Announcements.markAsRead"
+          ],
+          "label": "DIFFERENT_JOBS",
+          "note": "Mark one announcement read vs mark all read."
+        },
+        {
+          "members": [
+            "lib/retrieval/processing/csv.ts::processCSV",
+            "lib/retrieval/processing/docx.ts::processDocX",
+            "lib/retrieval/processing/json.ts::processJSON",
+            "lib/retrieval/processing/md.ts::processMarkdown",
+            "lib/retrieval/processing/pdf.ts::processPdf",
+            "lib/retrieval/processing/txt.ts::processTxt"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "One processor per file format; loaders differ by design, though the chunking tail is copied."
+        },
+        {
+          "members": [
+            "components/sidebar/items/all/sidebar-update-item.tsx::SidebarUpdateItem.handleSelectWorkspace",
+            "components/sidebar/items/assistants/assistant-item.tsx::AssistantItem.handleCollectionSelect",
+            "components/sidebar/items/assistants/assistant-item.tsx::AssistantItem.handleFileSelect",
+            "components/sidebar/items/assistants/assistant-item.tsx::AssistantItem.handleToolSelect",
+            "components/sidebar/items/assistants/create-assistant.tsx::CreateAssistant.handleRetrievalItemSelect",
+            "components/sidebar/items/assistants/create-assistant.tsx::CreateAssistant.handleToolSelect"
+          ],
+          "label": "SAME_JOB",
+          "note": "The same toggle-in-selection logic written six times; one generic helper would replace them."
+        },
+        {
+          "members": [
+            "components/chat/chat-hooks/use-chat-handler.tsx::useChatHandler.handleNewChat",
+            "components/chat/chat-hooks/use-prompt-and-command.tsx::usePromptAndCommand.handleSelectAssistant",
+            "components/chat/chat-ui.tsx::ChatUI.fetchChat",
+            "components/chat/quick-settings.tsx::QuickSettings.handleSelectQuickSetting"
+          ],
+          "label": "UNCLEAR",
+          "note": "Mixed: three share a copied 'load assistant files and tools' block, but the four functions do different overall jobs."
+        },
+        {
+          "members": [
+            "components/sidebar/items/folders/update-folder.tsx::UpdateFolder.handleUpdateFolder",
+            "db/folders.ts::updateFolder"
+          ],
+          "label": "DIFFERENT_JOBS",
+          "note": "UI click handler that calls the database function; caller and callee."
+        },
+        {
+          "members": [
+            "components/sidebar/items/folders/folder-item.tsx::Folder.handleDrop",
+            "components/sidebar/sidebar-data-list.tsx::SidebarDataList.handleDrop"
+          ],
+          "label": "DIFFERENT_JOBS",
+          "note": "Drop into a folder vs drop out of all folders."
+        },
+        {
+          "members": [
+            "db/assistant-tools.ts::createAssistantTool",
+            "db/tools.ts::createTool",
+            "db/tools.ts::createTools"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Per-entity create functions, single vs batch on purpose."
+        },
+        {
+          "members": [
+            "db/assistant-collections.ts::createAssistantCollection",
+            "db/collection-files.ts::createCollectionFile",
+            "db/collection-files.ts::createCollectionFiles",
+            "db/collections.ts::createCollection",
+            "db/collections.ts::createCollectionWorkspace",
+            "db/collections.ts::createCollections"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Per-entity create functions, single vs batch on purpose."
+        },
+        {
+          "members": [
+            "db/files.ts::updateFile",
+            "db/messages.ts::updateMessage",
+            "db/workspaces.ts::updateWorkspace"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Per-entity update functions with the same shape."
+        },
+        {
+          "members": [
+            "components/sidebar/sidebar-create-buttons.tsx::SidebarCreateButtons.handleCreateFolder",
+            "db/folders.ts::createFolder"
+          ],
+          "label": "DIFFERENT_JOBS",
+          "note": "UI handler that calls the database function; caller and callee."
+        },
+        {
+          "members": [
+            "db/files.ts::createFileWorkspaces",
+            "db/message-file-items.ts::createMessageFileItems"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Per-entity batch inserts."
+        },
+        {
+          "members": [
+            "components/sidebar/items/chat/update-chat.tsx::UpdateChat.handleUpdateChat",
+            "db/chats.ts::updateChat"
+          ],
+          "label": "DIFFERENT_JOBS",
+          "note": "UI handler that calls the database function; caller and callee."
+        },
+        {
+          "members": [
+            "components/messages/message.tsx::Message.handleKeyDown",
+            "lib/hooks/use-hotkey.tsx::useHotkey.handleKeyDown"
+          ],
+          "label": "DIFFERENT_JOBS",
+          "note": "Cmd+Enter to send an edit vs a global hotkey hook."
+        },
+        {
+          "members": [
+            "db/chat-files.ts::createChatFile",
+            "db/chats.ts::createChat"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Per-entity create functions."
+        },
+        {
+          "members": [
+            "db/assistant-files.ts::createAssistantFile",
+            "db/assistant-files.ts::createAssistantFiles",
+            "db/assistants.ts::createAssistant",
+            "db/assistants.ts::createAssistantWorkspace",
+            "db/files.ts::createFiles"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Per-entity create functions."
+        },
+        {
+          "members": [
+            "components/sidebar/items/folders/delete-folder.tsx::DeleteFolder.handleDeleteFolderAndItems",
+            "components/sidebar/sidebar-data-list.tsx::SidebarDataList.updateFolder"
+          ],
+          "label": "DIFFERENT_JOBS",
+          "note": "Delete a folder's items vs move an item into a folder."
+        }
+      ]
+    },
+    {
+      "name": "devika",
+      "source": "https://github.com/stitionai/devika",
+      "commit": "80bb343cbe4a4e5f5a0ba08d2524920139baceb6",
+      "groups": [
+        {
+          "members": [
+            "src/agents/coder/coder.py::Coder.validate_response",
+            "src/agents/feature/feature.py::Feature.validate_response"
+          ],
+          "label": "SAME_JOB",
+          "note": "The same response parser copied into two agents, and the copies have drifted: one splits on ':' and checks for '~~~', the other splits on a backtick."
+        },
+        {
+          "members": [
+            "src/agents/action/action.py::Action.execute",
+            "src/agents/answer/answer.py::Answer.execute",
+            "src/agents/decision/decision.py::Decision.execute",
+            "src/agents/feature/feature.py::Feature.execute",
+            "src/agents/internal_monologue/internal_monologue.py::InternalMonologue.execute",
+            "src/agents/patcher/patcher.py::Patcher.execute"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Each agent's execute method follows the same render, infer, validate shape on purpose."
+        },
+        {
+          "members": [
+            "src/llm/groq_client.py::Groq.inference",
+            "src/llm/lm_studio_client.py::LMStudio.inference",
+            "src/llm/mistral_client.py::MistralAi.inference"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "One adapter per LLM provider."
+        },
+        {
+          "members": [
+            "src/browser/browser.py::Browser.screenshot",
+            "src/browser/interaction.py::Crawler.screenshot"
+          ],
+          "label": "SAME_JOB",
+          "note": "Take a screenshot and record browser state, written once for async Playwright and once for sync."
+        },
+        {
+          "members": [
+            "src/agents/coder/coder.py::Coder.emulate_code_writing",
+            "src/agents/feature/feature.py::Feature.emulate_code_writing",
+            "src/agents/patcher/patcher.py::Patcher.emulate_code_writing"
+          ],
+          "label": "SAME_JOB",
+          "note": "The same 'emulate code writing' loop copied into three agents, with small drift (sleep time, one keeps the browser session)."
+        },
+        {
+          "members": [
+            "src/project.py::ProjectManager.delete_project",
+            "src/state.py::AgentState.delete_state"
+          ],
+          "label": "DIFFERENT_JOBS",
+          "note": "Delete a project row vs delete all agent-state rows."
+        },
+        {
+          "members": [
+            "src/project.py::ProjectManager.add_message_to_project",
+            "src/state.py::AgentState.add_to_current_state"
+          ],
+          "label": "DIFFERENT_JOBS",
+          "note": "Append a message to a project vs append a state to the agent stack; same JSON-stack pattern on different tables."
+        }
+      ]
+    },
+    {
+      "name": "flask",
+      "source": "https://github.com/pallets/flask",
+      "commit": "49943b5a94413a530761350f04e896f76e8d620e",
+      "groups": [
+        {
+          "members": [
+            "src/flask/app.py::Flask.get_send_file_max_age",
+            "src/flask/blueprints.py::Blueprint.get_send_file_max_age"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Flask and Blueprint each keep this method; the docstring says the duplicate is deliberate."
+        },
+        {
+          "members": [
+            "src/flask/app.py::Flask.open_instance_resource",
+            "src/flask/app.py::Flask.open_resource",
+            "src/flask/blueprints.py::Blueprint.open_resource"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "App and blueprint versions are deliberate; open_instance_resource also allows writing."
+        },
+        {
+          "members": [
+            "src/flask/sansio/app.py::App._check_setup_finished",
+            "src/flask/sansio/blueprints.py::Blueprint._check_setup_finished"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "App and blueprint each check their own setup state with their own message."
+        },
+        {
+          "members": [
+            "src/flask/sansio/blueprints.py::Blueprint.app_errorhandler",
+            "src/flask/sansio/scaffold.py::Scaffold.errorhandler"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Blueprint's app-wide error handler delegates to the app's errorhandler by design."
+        },
+        {
+          "members": [
+            "src/flask/app.py::Flask.url_for",
+            "src/flask/helpers.py::url_for"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "The module-level url_for is a thin wrapper around the app method, on purpose."
+        },
+        {
+          "members": [
+            "src/flask/sansio/blueprints.py::Blueprint.add_url_rule",
+            "src/flask/sansio/scaffold.py::Scaffold.add_url_rule"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Blueprint overrides add_url_rule to record it for later registration."
+        }
+      ]
+    },
+    {
+      "name": "full-stack-fastapi-template",
+      "source": "https://github.com/fastapi/full-stack-fastapi-template",
+      "commit": "aabb90126964a164e02aff39e7c385bb0598236d",
+      "groups": [
+        {
+          "members": [
+            "backend/app/api/routes/items.py::create_item",
+            "backend/app/crud.py::create_item"
+          ],
+          "label": "SAME_JOB",
+          "note": "The route rebuilds the item itself instead of calling crud.create_item, which does the same thing."
+        },
+        {
+          "members": [
+            "backend/app/api/routes/items.py::delete_item",
+            "backend/app/api/routes/users.py::delete_user"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "One delete route per entity, with entity-specific rules."
+        },
+        {
+          "members": [
+            "backend/app/api/routes/items.py::read_items",
+            "backend/app/api/routes/users.py::read_users"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "One list route per entity."
+        },
+        {
+          "members": [
+            "backend/app/core/security.py::create_access_token",
+            "backend/app/utils.py::generate_password_reset_token"
+          ],
+          "label": "UNCLEAR",
+          "note": "Both build a signed JWT with an expiry, but for different purposes and with different claims. Could share a helper; arguable either way."
+        }
+      ]
+    },
+    {
+      "name": "gpt-engineer",
+      "source": "https://github.com/AntonOsika/gpt-engineer",
+      "commit": "a90fcd543eedcc0ff2c34561bc0785d2ba83c47e",
+      "groups": [
+        {
+          "members": [
+            "gpt_engineer/applications/cli/cli_agent.py::CliAgent.init",
+            "gpt_engineer/core/default/simple_agent.py::SimpleAgent.init"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "CliAgent is the configurable version of SimpleAgent; separate agent classes on purpose."
+        },
+        {
+          "members": [
+            "gpt_engineer/core/default/steps.py::gen_code",
+            "gpt_engineer/tools/custom_steps.py::lite_gen"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "lite_gen is the deliberate 'lite' variant of gen_code with a different prompt order."
+        },
+        {
+          "members": [
+            "gpt_engineer/applications/cli/cli_agent.py::CliAgent.improve",
+            "gpt_engineer/core/default/simple_agent.py::SimpleAgent.improve"
+          ],
+          "label": "INTENTIONAL_VARIANTS",
+          "note": "Same as #1, for improve."
+        }
+      ]
+    },
+    {
+      "name": "taxonomy",
+      "source": "https://github.com/shadcn-ui/taxonomy",
+      "commit": "298a8857c7128a0d121e7f699dfd729f23b3966d",
+      "groups": [
+        {
+          "members": [
+            "components/editor.tsx::Editor.onSubmit",
+            "components/user-name-form.tsx::UserNameForm.onSubmit"
+          ],
+          "label": "DIFFERENT_JOBS",
+          "note": "Save a post vs update the user's name; same fetch-and-toast pattern, different jobs."
+        }
+      ]
+    },
+    {
+      "name": "ticketX1",
+      "source": "~/Desktop/ticketX1",
+      "commit": "2f325c4fc8d110889cb2dc0ec767aacc17294d27",
+      "groups": [
+        {
+          "members": [
+            "client/src/pages/EventDetails.jsx::EventDetails.handleLeaveWaitlist",
+            "client/src/pages/MyTickets.jsx::MyTickets.handleLeave"
+          ],
+          "label": "SAME_JOB",
+          "note": "Both leave an event's waitlist, written separately on two pages."
+        },
+        {
+          "members": [
+            "client/src/pages/Login.jsx::Login.handleSubmit",
+            "client/src/pages/Register.jsx::Register.handleSubmit"
+          ],
+          "label": "DIFFERENT_JOBS",
+          "note": "Log in vs register; only the form-submit shape is shared."
+        }
+      ]
+    }
+  ]
+}

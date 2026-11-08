@@ -1,0 +1,12 @@
+target/
+.driftguard/
+*.db
+*.db-shm
+*.db-wal
+driftguard-report*.md
+report.md
+__pycache__/
+.idea/
+.vscode/
+*.iml
+.DS_Store
