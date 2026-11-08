@@ -16,18 +16,29 @@
 
 ## Results
 
-Every number below comes from hand-checking findings on public repos. Most were measured on repos the tool was never tuned on.
+Every number below comes from hand-checking findings on public repos the tool was never tuned on. All verdicts, with a reason for each, are in [eval/final-check.md](eval/final-check.md).
 
-| What was measured | Result |
+**The LLM check for duplicated logic** (33 hand-labeled groups from 5 held-out repos):
+
+| Measured | Result |
 |---|---|
-| **Pattern-Drift**: duplicated logic, on 33 hand-labeled groups from 5 held-out repos | **82% precision, 82% recall**, vs 52% precision for word similarity alone |
-| Rewriting the LLM prompt, measured on the same held-out set | Recall went from **31% to 82%**, and precision went up too |
-| **Spec-Drift**: findings ranked as likely issues, on 5 repos it had never seen | **40 of 41** confirmed by hand |
-| Spec-Drift's weakest check, "variable never read" | 4 of 15 (27%), so it's reported as a lead for review, never as a likely issue |
-| **Dead-Dep**: high-confidence unused dependencies across 6 repos | 22 flagged, 21 confirmed by text search (the miss was a peer dependency) |
-| Cost of an LLM-checked audit with Groq's free tier | About 1-2k tokens for a small repo, **$0** |
+| Groups the LLM confirms as the same job | **82% precision, 82% recall**, vs 52% precision for word similarity alone |
+| Effect of rewriting the prompt | Recall went from **31% to 82%**, and precision went up too |
+| Cost with Groq's free tier | About 1-2k tokens for a small repo, **$0** |
 
-The labels, results and reasoning behind every change are in [eval/](eval/) and [docs/DECISIONS.md](docs/DECISIONS.md). Samples are small (17 positive groups in the held-out set), so treat the percentages as good first evidence, not settled numbers.
+**Static "likely issues" on 22 varied AI-era repos** (open-canvas, gpt-pilot, cline, mem0, aider, DocsGPT and 16 more; 668 findings):
+
+| Check | Real / judged | Precision |
+|---|---:|---:|
+| Competing libraries: HTTP clients, icon and date libraries | 17 / 18 | **94%** |
+| Competing libraries: all kinds (logging and database layers are weaker) | 21 / 36 | 58% |
+| Unused dependencies | 95 / 156 | 61% |
+| Copied code (random sample of 50 of 378) | 28 / 50 | 56% |
+| Docs vs code: broken links, missing files and scripts | 39 / 89 | 44% |
+
+Most false alarms come from code the project didn't write by hand: **template projects** (create-llama, gpt-pilot, llamacoder), **generated bundles** (mem0's plugin copies), docs-site links, and build outputs. Earlier tests on smaller repo sets scored much higher (40 of 41 for docs vs code), because those repos happened to have no templates. Recognizing template and generated folders is the next fix, and it will be measured on a fresh set of repos.
+
+"Needs your review" items are leads: 4 of 28 sampled turned out to be real problems.
 
 ## Quick start
 
@@ -125,6 +136,6 @@ The audited repo is treated as untrusted:
 
 Working: ingestion, the three agents, Markdown, HTML and JSON reports, the pull request Action, and the eval harness, for Python and JS/TS.
 
-Known limits: functions that do the same job in very different words are missed; Spec-Drift checks concrete things like links and commands, not prose claims like "supports PDF export"; Java repos aren't audited yet. The full list is in [docs/how-it-works.md](docs/how-it-works.md#known-limits).
+Known limits: template and generated folders cause most false alarms (see Results); functions that do the same job in very different words are missed; Spec-Drift checks concrete things like links and commands, not prose claims like "supports PDF export"; Java repos aren't audited yet. The full list is in [docs/how-it-works.md](docs/how-it-works.md#known-limits).
 
 Built with Java 21, picocli, SQLite and Jackson.

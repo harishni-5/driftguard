@@ -143,6 +143,24 @@ Real examples it found:
 
 **Auditing DriftGuard with itself (2026-11-08):** running it on its own repo found 14 false "drift" findings in the vendored Babel parser, plus a decision log read as instructions. Now files over 10,000 lines, or with their own `.LICENSE` file next to them, count as third-party and are skipped by Pattern-Drift. Decision logs are skipped by Spec-Drift like changelogs. What remains on its own repo is one review-level lead: the README quotes another repo's variable as an example.
 
+**Final test on 22 unseen repos (2026-11-08):** static only, no rule changes between running and judging. Every verdict and its reason are in [eval/final-check.md](../eval/final-check.md). The repos: langchain-ai/open-canvas, local-deep-researcher, chat-langchain; Pythagora-io/gpt-pilot; smol-ai/developer; yoheinakajima/babyagi; nextjs/saas-starter; steven-tey/novel; qodo-ai/pr-agent; OpenBMB/ChatDev; run-llama/create-llama; arc53/DocsGPT; QuivrHQ/quivr; zylon-ai/private-gpt; stanford-oval/storm; Nutlope/llamacoder, aicommits, turboseek; TransformerOptimus/SuperAGI; mem0ai/mem0; Aider-AI/aider; cline/cline.
+
+| Likely issues | Checked | Real | False | Unsure | Precision |
+|---|---:|---:|---:|---:|---:|
+| Competing libraries (all) | 40 | 21 | 15 | 4 | 58% (HTTP/icons/dates: 17/18 = 94%; print vs logging 4/10; database layers 0/7) |
+| Unused dependencies (all) | 161 | 95 | 61 | 5 | 61% |
+| Docs vs code (all) | 89 | 39 | 50 | 0 | 44% |
+| Copied code (random 50 of 378) | 50 | 28 | 22 | 0 | 56% |
+| Review leads (random 30 of 2,543) | 30 | 4 | 24 | 2 | 14% (similar functions 4/13; unused-dependency leads 0/15) |
+
+What this means:
+- **The earlier static numbers didn't generalize.** 40/41 (docs vs code) and 21/22 (unused deps) came from 5-6 repos without templates or generated code. On 22 varied repos, static likely issues are right a bit over half the time. The LLM-checked duplicate finder (82/82 on held-out) is still the strongest result.
+- **One cause dominates: code the project didn't write by hand.** Template projects (create-llama: 30 doc findings and 8 dependencies; gpt-pilot: 18 dependencies; llamacoder preview kits: 9) and generated bundles (mem0's 7 plugin copies built from `integrations/agent-plugin-core`: about 20 of 50 sampled copies).
+- **Other causes:** docs-site links to built `.html` pages (aider: 9); build outputs like `dist/cli.mjs`; tutorials that say "save this as x.py" first; `bun run file.ts` misread as a script (parser bug); tools run by command name (`buf`, `vsce`, vitest coverage, biome); platform-specific binaries; lockfile-style requirements read as manifests; `pip freeze` files full of transitive dependencies (all DocsGPT review leads); `urllib.parse` counted as an HTTP client (catalog bug); one database adapter per backend reported as competing layers.
+- **Next fix, in order of payoff:** recognize template and generated folders; skip built-page links and `dist/` paths; treat `bun run <file>` as a file; drop database layers and print-vs-logging from likely issues; treat freeze files like lockfiles. **Re-measure on a fresh set of repos.** Quoting improved numbers from these 22 would be tuning on the test.
+
+**Resume-safe claims after this test:** the LLM duplicate check (82% precision and recall on held-out data, recall 31% → 82% from a prompt rewrite); competing HTTP/icon/date libraries at 94% (17/18) on 22 unseen repos; "measured on 22 open-source repos, with 668 static findings and a published per-finding audit". Don't quote 40/41 or 21/22 as general precision anymore.
+
 ## What hasn't been verified
 
 - **Gemini live:** needs a free key, and it's only been tested against a local fake server. Groq now works live.
