@@ -128,3 +128,11 @@ Working: ingestion, the three agents, Markdown, HTML and JSON reports, the pull 
 Known limits: functions that do the same job in very different words are missed; Spec-Drift checks concrete things like links and commands, not prose claims like "supports PDF export"; Java repos aren't audited yet. The full list is in [docs/how-it-works.md](docs/how-it-works.md#known-limits).
 
 Built with Java 21, picocli, SQLite and Jackson.
+
+## Demo section (planted drift for testing the PR comment)
+
+See the [playground guide](docs/playground.md), then seed the data:
+
+```bash
+npm run seed
+```
