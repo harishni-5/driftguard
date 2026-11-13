@@ -203,13 +203,16 @@ What this means:
 
 **Results:** hybrid search puts a file that answers the question in the top 5 for 85% of 40 held-out questions (keywords 78%, vectors 78%, MRR 0.68). Details are in [how-it-works.md](how-it-works.md#code-search-and-ask-rag).
 
-**Pending:** Pattern-Drift prompt v3 (with retrieved call sites) vs v2 on the held-out labels. It needs a Groq key:
+**Retrieved context for Pattern-Drift: measured, and it hurt.** Prompt v3 (v2 plus up to 4 retrieved call sites and 1 doc mention) against v2, both on the held-out labels, same run, Groq `gpt-oss-120b`:
 
-```bash
-java -jar target/driftguard.jar eval eval/pattern-drift-heldout.json --prompt v2,v3 --out eval/results-heldout-rag.md
-```
+| Prompt | Precision | Recall | Exact 4-way match |
+|---|---:|---:|---:|
+| v2 (no context) | **88%** | **88%** | 24 of 33 |
+| v3 (with retrieved call sites) | 86% | 71% | 21 of 33 |
 
-The agent keeps v2 unless v3 wins.
+v3 fixed 2 groups and broke 5. All 5 breaks follow one pattern: the call sites showed the copies being used from different places (desktop vs mobile page, two separate eval scripts), and the model read that as "kept separate on purpose". That is the exact mistake prompt v2 was written to stop ("being in separate places is not, by itself, a reason to keep a copy"). More context brought the old bias back, so **the agent keeps v2**. v3 stays in the code so the experiment can be rerun with other models. Per-group answers: [eval/results-heldout-rag-v2.md](../eval/results-heldout-rag-v2.md), [eval/results-heldout-rag-v3.md](../eval/results-heldout-rag-v3.md).
+
+The same v2 prompt scored 82%/82% on an earlier run and 88%/88% here, at temperature 0. That is run-to-run variation from the hosted model, so treat about ±6 points as noise on 33 groups.
 
 **Resume line:** "Built a RAG layer (symbol-level chunking, BM25 + embedding hybrid search with reciprocal rank fusion, SQLite vector cache, cited answers) that finds the right file in the top 5 for 85% of held-out questions, vs 78% for either method alone."
 

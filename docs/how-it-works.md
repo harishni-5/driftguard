@@ -70,7 +70,7 @@ It reads the repo's Markdown docs (READMEs, `docs/`, and AI-assistant files like
 
 **In the agents:**
 
-- Pattern-Drift's prompt v3 adds `<context>`: up to 4 call sites of the group's functions and 1 doc mention, retrieved from the index (`RelatedCode`). Whether v3 beats v2 is measured on the held-out labels; the agent uses v2 until it does.
+- Pattern-Drift's prompt v3 adds `<context>`: up to 4 call sites of the group's functions and 1 doc mention, retrieved from the index (`RelatedCode`). On the held-out labels it scored worse than v2 (precision 86% vs 88%, recall 71% vs 88%). Seeing callers in different places made the model call real copies intentional, so the agent keeps v2. See [DECISIONS.md](DECISIONS.md#rag-layer-added-2026-11-13).
 - Spec-Drift's `MovedFiles` names where a missing file probably went: a file with the same name elsewhere ("probably moved"), or a retrieved file with the same extension whose name contains the old name's words ("may have been renamed").
 
 **Measured** with `driftguard eval-rag`, on hand-written questions whose answer files were noted by reading the code first:

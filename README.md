@@ -77,7 +77,7 @@ It splits the repo into functions and doc sections, finds the most relevant ones
 
 Embeddings are free: `ollama pull nomic-embed-text` keeps everything local, or a `GEMINI_API_KEY` uses Gemini's free tier. With neither, search uses keywords only. Vectors are cached in SQLite by content hash, so a second run only embeds what changed.
 
-The same search feeds the audit: Pattern-Drift can show the LLM where each similar function is called, and Spec-Drift names the likely new location of a file that a doc points at but that has moved.
+The same search feeds the audit: Spec-Drift names the likely new location of a file that a doc points at but that has moved. Giving Pattern-Drift's LLM the retrieved call sites was also tried and measured. It *lowered* recall from 88% to 71%, because callers in different places made real copies look intentional, so it's off ([details](docs/DECISIONS.md#rag-layer-added-2026-11-13)).
 
 ## Use it on pull requests
 
