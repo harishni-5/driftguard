@@ -7,6 +7,8 @@ import dev.driftguard.agents.patterndrift.PatternDriftAgent;
 import dev.driftguard.agents.specdrift.SpecDriftAgent;
 import dev.driftguard.llm.LlmClient;
 import dev.driftguard.llm.LlmFactory;
+import dev.driftguard.rag.Embedder;
+import dev.driftguard.rag.EmbedderFactory;
 import dev.driftguard.report.HtmlReport;
 import dev.driftguard.report.JsonReport;
 import dev.driftguard.report.MarkdownReport;
@@ -42,6 +44,9 @@ final class AuditCommand implements Callable<Integer> {
     @Option(names = "--model", description = "Model id. Default: picked for the provider.")
     private String model;
 
+    @Option(names = "--embed", description = "Embeddings for retrieving context: none (keywords only), auto, ollama or gemini. Default: ${DEFAULT-VALUE}.")
+    private String embed = "none";
+
     @Override
     public Integer call() {
         try (Database database = Database.open(db)) {
@@ -50,7 +55,14 @@ final class AuditCommand implements Callable<Integer> {
             boolean json = name.endsWith(".json");
             // JSON is for comparing commits, so it lists every group rather than the strongest few.
             List<AuditAgent> agents = List.of(new DeadDepAgent(), new PatternDriftAgent(json), new SpecDriftAgent());
-            AuditPipeline.Result result = AuditPipeline.run(repo, database, llm, agents);
+            if (noLlm && embed.equalsIgnoreCase("gemini")) {
+                throw new IllegalArgumentException("--no-llm sends nothing anywhere, so it can't use Gemini embeddings. Use --embed ollama or none.");
+            }
+            Embedder embedder = EmbedderFactory.fromSystem().create(noLlm && embed.equalsIgnoreCase("auto") ? "local" : embed).orElse(null);
+            if (embedder != null) System.out.println("Embeddings: " + embedder.model());
+            AuditPipeline.Result result = AuditPipeline.run(repo, database, llm, agents, embedder,
+                    message -> System.err.print("\r" + message + "   "));
+            if (embedder != null) System.err.println();
             boolean html = name.matches(".*\\.html?$");
             Files.writeString(out, json ? JsonReport.render(result) : html ? HtmlReport.render(result) : MarkdownReport.render(result));
 

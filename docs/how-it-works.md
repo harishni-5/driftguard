@@ -6,9 +6,11 @@
 flowchart LR
     A[Repo: local folder or https URL] --> B[Ingest]
     B -->|Python ast, Babel| C[(SQLite: files, symbols, imports, calls)]
+    C --> R[(Search index: BM25 + embeddings)]
     C --> D[Dead-Dep]
     C --> E[Pattern-Drift]
     C --> F[Spec-Drift]
+    R -->|call sites, moved files| E & F
     D & E -->|only ambiguous cases| G{{Free LLM: Groq, Gemini or Ollama}}
     G -->|re-rank, never delete| D & E
     D & E & F --> H[Findings + traces in SQLite]
@@ -56,6 +58,30 @@ It reads the repo's Markdown docs (READMEs, `docs/`, and AI-assistant files like
 | **Docs name the wrong variable** | The docs say `SUPABASE_URL`, but the code reads `NEXT_PUBLIC_SUPABASE_URL` | Likely issue |
 | **Variable never read** | The docs say to set a variable that no code, config or script mentions | Needs your review: docs often describe settings a separate tool reads |
 
+## Code search and `ask` (RAG)
+
+`dev.driftguard.rag` turns a repo into a searchable index:
+
+1. **Chunking** (`Chunker`). Python and JS/TS are split along the parser's symbol table: one chunk per outermost function or method, a short header chunk per class, and windows for leftover module code. Docs are split by heading. Other code and config files get 60-line windows with 10 lines of overlap, and functions over 150 lines are windowed too. Templates, synced copies, lockfiles and files over 10,000 lines are left out.
+2. **Keywords** (`Bm25`). Okapi BM25 over identifier-aware tokens: `getUserName` and `get_user_name` both index as `user`, `name` and the whole identifier, plus a light plural trim. Names and paths count double.
+3. **Vectors** (`Embedder`, `HttpEmbedder`). Ollama's `nomic-embed-text` (local, with its `search_document:` and `search_query:` prefixes) or Gemini's `gemini-embedding-001` (768 dimensions, separate query and document modes). Vectors are cached in the `embeddings` table keyed by content hash and model. Search is a brute-force cosine loop, which takes milliseconds at repo scale.
+4. **Hybrid ranking** (`RagIndex`). Reciprocal rank fusion (k = 60) of the top 100 keyword and vector results. Test files and fixtures get weight 0.7, because they repeat the words of the code they test and crowded it out of "how does X work" answers. If embedding fails, search falls back to keywords with a warning.
+5. **Answering** (`Answerer`). The top 8 chunks, each clipped to 60 lines and with key-like strings masked, go to the LLM as numbered, untrusted sources (at most 16,000 characters, to fit free-tier limits). The model answers with citations like `[2]` and sets `answerable` to false when the sources don't cover the question. Citations to sources that don't exist are dropped.
+
+**In the agents:**
+
+- Pattern-Drift's prompt v3 adds `<context>`: up to 4 call sites of the group's functions and 1 doc mention, retrieved from the index (`RelatedCode`). Whether v3 beats v2 is measured on the held-out labels; the agent uses v2 until it does.
+- Spec-Drift's `MovedFiles` names where a missing file probably went: a file with the same name elsewhere ("probably moved"), or a retrieved file with the same extension whose name contains the old name's words ("may have been renamed").
+
+**Measured** with `driftguard eval-rag`, on hand-written questions whose answer files were noted by reading the code first:
+
+| Set | Keyword top 5 | Vector top 5 | Hybrid top 5 | Hybrid MRR@10 |
+|---|---:|---:|---:|---:|
+| Dev: 50 questions, markitdown and ai-chatbot | 60% | 80% | 74% | 0.54 |
+| Held-out: 40 questions, full-stack-fastapi-template and fragments | 78% | 78% | **85%** | **0.68** |
+
+The dev questions deliberately avoid the code's own names, so vectors win there. The held-out set mixes in questions with names from config and error messages, as real questions have, and hybrid wins. The test-file weight was the only change made after looking at dev results; it raised dev top-5 from 62% to 74% for hybrid. Settings were fixed before the held-out set ran. Per-question ranks: [eval/results-rag-dev.md](../eval/results-rag-dev.md), [eval/results-rag-heldout.md](../eval/results-rag-heldout.md).
+
 ## Measuring accuracy
 
 [eval/pattern-drift-labels.json](../eval/pattern-drift-labels.json) holds 50 similar-function groups from 7 repos, each labeled by hand before any LLM saw it, and pinned to the exact commit it came from. The `eval` command asks the LLM about every group and scores its answers:
@@ -76,12 +102,13 @@ The labels are one person's judgment. The line between "same job" and "same shap
 
 ```
 src/main/java/dev/driftguard/
-  cli/        picocli commands (audit, diff, eval, doctor)
+  cli/        picocli commands (audit, ask, diff, eval, eval-rag, doctor)
   ingest/     clone or open a repo, walk files, run the parser helpers
   manifest/   read requirements.txt, pyproject.toml, Pipfile, setup.py, setup.cfg, package.json
   agents/     AuditAgent interface, Finding, and one package per agent
   llm/        LlmClient interface, provider selection, OpenAI-format client (Groq, Gemini, Ollama), Claude client
-  store/      all SQLite access
+  rag/        chunking, BM25, embeddings, hybrid search, answering with citations, retrieval eval
+  store/      all SQLite access, including the embedding cache
   report/     Markdown, HTML and JSON output, and the pull request comment
 src/main/resources/
   helpers/    parser subprocesses: Python (ast) and Node (vendored Babel)
@@ -100,7 +127,7 @@ src/main/resources/
 - **Peer dependencies:** a package needed only as another package's peer looks unused. `shiki` under `rehype-pretty-code` is a real example. Lockfiles could fix this.
 - **Curated tables:** `KnownPackages` and `python-import-names.txt` are hand-written and will never be complete. Unknown names go to review rather than being called unused.
 - **Regex fallback:** files the parsers can't read fall back to a rough import scan, and findings in that scope get lower confidence.
-- **Different wording:** Pattern-Drift only compares words, so the same job written in very different words is missed. Embeddings would help. A test documents this.
+- **Different wording:** Pattern-Drift's candidate search only compares words, so the same job written in very different words is missed. A test documents this. Code search has the same gap when a question's words differ from the code's: "how does sharing create a short link" misses `publish.ts`, which talks about `kv` and `nanoid`.
 - **Error-handling style:** differences such as `.then` vs `await` aren't detected yet.
 - **Feature claims in prose:** Spec-Drift checks concrete things (links, commands, scripts, variables), not sentences like "supports PDF export".
 - **Scope:** Java repos aren't audited yet, and neither are multi-language dependency managers such as Bazel.

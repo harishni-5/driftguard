@@ -38,6 +38,12 @@ final class EvalCommand implements Callable<Integer> {
     @Option(names = "--prompt", split = ",", description = "Prompt versions to score, e.g. v1,v2. Default: the one the agent uses.")
     private List<String> prompts = List.of(dev.driftguard.agents.patterndrift.PatternDriftAgent.CURRENT_PROMPT);
 
+    @Option(names = "--embed", description = "Embeddings for prompt versions with retrieved context (v3): auto, ollama, gemini or none. Default: ${DEFAULT-VALUE}.")
+    private String embed = "auto";
+
+    @Option(names = "--db", description = "SQLite file that caches embeddings. Default: ${DEFAULT-VALUE}.")
+    private Path db = Path.of(System.getProperty("user.home"), ".driftguard", "driftguard.db");
+
     private static Path withSuffix(Path path, String suffix) {
         String name = path.getFileName().toString();
         int dot = name.lastIndexOf('.');
@@ -68,9 +74,14 @@ final class EvalCommand implements Callable<Integer> {
                 return 1;
             }
             System.out.println("Using model: " + llm.model());
+            boolean needsIndex = prompts.stream().anyMatch(dev.driftguard.agents.patterndrift.PatternDriftAgent::usesContext);
+            dev.driftguard.rag.Embedder embedder = needsIndex
+                    ? dev.driftguard.rag.EmbedderFactory.fromSystem().create(embed).orElse(null) : null;
+            if (needsIndex) System.out.println("Retrieval: " + (embedder == null ? "BM25 keywords only" : embedder.model() + " + BM25"));
+            try (dev.driftguard.store.Database cache = needsIndex ? dev.driftguard.store.Database.open(db) : null) {
             for (String version : prompts) {
-                PatternDriftEval.Outcome outcome = PatternDriftEval.run(file, repoDir, llm, version,
-                        step -> System.out.print("\rPrompt " + version + ": checking group " + step + "   "));
+                PatternDriftEval.Outcome outcome = PatternDriftEval.run(file, repoDir, llm, version, embedder, cache,
+                        step -> System.out.print("\rPrompt " + version + ": " + step + "   "));
                 System.out.println();
                 Path target = prompts.size() == 1 ? out : withSuffix(out, "-" + version);
                 Files.writeString(target, PatternDriftEval.report(outcome, llm.model()));
@@ -80,8 +91,9 @@ final class EvalCommand implements Callable<Integer> {
                 outcome.warnings().forEach(w -> System.err.println("warning: " + w));
                 System.out.println("Results: " + target.toAbsolutePath());
             }
+            }
             return 0;
-        } catch (IOException | IllegalArgumentException e) {
+        } catch (IOException | IllegalArgumentException | java.sql.SQLException e) {
             System.err.println("error: " + e.getMessage());
             return 1;
         } catch (InterruptedException e) {

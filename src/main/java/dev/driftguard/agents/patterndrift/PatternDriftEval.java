@@ -143,6 +143,16 @@ public final class PatternDriftEval {
 
     public static Outcome run(LabelFile labels, Path repoDir, LlmClient llm, String promptVersion, Consumer<String> progress)
             throws IOException, InterruptedException {
+        return run(labels, repoDir, llm, promptVersion, null, null, progress);
+    }
+
+    /**
+     * @param embedder for prompt versions with retrieved context; null searches by keywords only
+     * @param cache where embeddings are kept between runs; may be null
+     */
+    public static Outcome run(LabelFile labels, Path repoDir, LlmClient llm, String promptVersion,
+                              dev.driftguard.rag.Embedder embedder, dev.driftguard.store.Database cache, Consumer<String> progress)
+            throws IOException, InterruptedException {
         if (!PatternDriftAgent.PROMPTS.containsKey(promptVersion)) {
             throw new IllegalArgumentException("Unknown prompt version " + promptVersion + ". Known: " + PatternDriftAgent.PROMPTS.keySet());
         }
@@ -152,8 +162,16 @@ public final class PatternDriftEval {
         for (RepoEntry repo : labels.repos()) {
             if (repo.groups() == null || repo.groups().isEmpty()) continue;
             Map<List<String>, Group> found = new LinkedHashMap<>();
+            dev.driftguard.rag.RagIndex rag = null;
             try (RepoSource source = open(repo, repoDir, warnings)) {
-                for (Group group : groups(source)) found.put(key(group), group);
+                RepoSnapshot snapshot = RepoIngestor.ingest(source);
+                for (Group group : SimilarFunctions.find(snapshot, new CodeAreas(snapshot)).similar()) found.put(key(group), group);
+                if (PatternDriftAgent.usesContext(promptVersion)) {
+                    rag = dev.driftguard.rag.RagIndex.build(snapshot, embedder, cache, progress);
+                    warnings.addAll(rag.warnings());
+                }
+            } catch (java.sql.SQLException e) {
+                throw new IOException("Could not use the embedding cache: " + e.getMessage(), e);
             } catch (IOException e) {
                 warnings.add("Skipped " + repo.name() + ": " + e.getMessage());
                 missing += repo.groups().size();
@@ -169,7 +187,7 @@ public final class PatternDriftEval {
                 }
                 progress.accept(repo.name() + " " + (rows.size() + 1));
                 try {
-                    LlmClient.Result<GroupReview> result = PatternDriftAgent.ask(llm, group, promptVersion);
+                    LlmClient.Result<GroupReview> result = PatternDriftAgent.ask(llm, group, promptVersion, rag);
                     GroupReview review = result.value();
                     Decision decision = review.decision() == null ? Decision.UNSURE : review.decision();
                     rows.add(new Row(repo.name(), members, labeled.label(), decision, review.purpose(), labeled.note(),

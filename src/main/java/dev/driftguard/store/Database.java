@@ -307,6 +307,58 @@ public final class Database implements AutoCloseable {
         }
     }
 
+    /** Cached vectors for these content hashes. Missing ones simply aren't in the map. */
+    public Map<String, float[]> loadEmbeddings(String model, java.util.Collection<String> shas) throws SQLException {
+        Map<String, float[]> found = new java.util.HashMap<>();
+        List<String> all = List.copyOf(new java.util.LinkedHashSet<>(shas));
+        int batch = 500;
+        for (int from = 0; from < all.size(); from += batch) {
+            List<String> part = all.subList(from, Math.min(all.size(), from + batch));
+            String marks = String.join(",", java.util.Collections.nCopies(part.size(), "?"));
+            try (PreparedStatement query = connection.prepareStatement(
+                    "SELECT content_sha, vector FROM embeddings WHERE model = ? AND content_sha IN (" + marks + ")")) {
+                query.setString(1, model);
+                for (int i = 0; i < part.size(); i++) query.setString(i + 2, part.get(i));
+                try (ResultSet result = query.executeQuery()) {
+                    while (result.next()) found.put(result.getString(1), fromBlob(result.getBytes(2)));
+                }
+            }
+        }
+        return found;
+    }
+
+    public void saveEmbeddings(String model, Map<String, float[]> vectors) throws SQLException {
+        if (vectors.isEmpty()) return;
+        String now = java.time.Instant.now().toString();
+        inTransaction(() -> {
+            try (PreparedStatement insert = connection.prepareStatement(
+                    "INSERT OR REPLACE INTO embeddings (content_sha, model, dimensions, vector, created_at) VALUES (?, ?, ?, ?, ?)")) {
+                for (Map.Entry<String, float[]> entry : vectors.entrySet()) {
+                    insert.setString(1, entry.getKey());
+                    insert.setString(2, model);
+                    insert.setInt(3, entry.getValue().length);
+                    insert.setBytes(4, toBlob(entry.getValue()));
+                    insert.setString(5, now);
+                    insert.addBatch();
+                }
+                insert.executeBatch();
+            }
+        });
+    }
+
+    static byte[] toBlob(float[] vector) {
+        java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(vector.length * 4).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        for (float value : vector) buffer.putFloat(value);
+        return buffer.array();
+    }
+
+    static float[] fromBlob(byte[] blob) {
+        java.nio.FloatBuffer buffer = java.nio.ByteBuffer.wrap(blob).order(java.nio.ByteOrder.LITTLE_ENDIAN).asFloatBuffer();
+        float[] vector = new float[buffer.remaining()];
+        buffer.get(vector);
+        return vector;
+    }
+
     /** Row count for one table. The table name must come from our code, never from input. */
     public long count(String table) throws SQLException {
         try (Statement statement = connection.createStatement();

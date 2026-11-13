@@ -1,0 +1,59 @@
+{
+  "description": "Held-out retrieval questions on two repos never used while building or tuning retrieval. Written, and the search settings (hybrid default, test-file weight 0.7) fixed, before retrieval ran on these repos. Unlike the first set, about half the questions include a name a developer would know from an error message or config file, since real questions often do.",
+  "repos": [
+    {
+      "name": "full-stack-fastapi-template",
+      "source": "https://github.com/fastapi/full-stack-fastapi-template",
+      "commit": "aabb90126964a164e02aff39e7c385bb0598236d",
+      "questions": [
+        {"q": "How does an API request find out which user is logged in?", "expected": ["backend/app/api/deps.py"]},
+        {"q": "How are login tokens created and how long do they last?", "expected": ["backend/app/core/security.py", "backend/app/api/routes/login.py"]},
+        {"q": "Which algorithm hashes user passwords?", "expected": ["backend/app/core/security.py"]},
+        {"q": "How does the password reset email flow work?", "expected": ["backend/app/api/routes/login.py", "backend/app/utils.py"]},
+        {"q": "Where is the first admin account created on startup?", "expected": ["backend/app/core/db.py", "backend/app/initial_data.py"]},
+        {"q": "Which origins may call the API from a browser?", "expected": ["backend/app/main.py", "backend/app/core/config.py"]},
+        {"q": "What happens to a user's items when the user is deleted?", "expected": ["backend/app/models.py", "backend/app/api/routes/users.py"]},
+        {"q": "How do database migrations run before the backend starts?", "expected": ["backend/scripts/prestart.sh", "backend/README.md"]},
+        {"q": "How is the frontend's API client regenerated after the backend changes?", "expected": ["frontend/openapi-ts.config.ts", "frontend/README.md", "scripts/generate-client.sh"]},
+        {"q": "How does the frontend keep users who aren't logged in out of the dashboard?", "expected": ["frontend/src/routes/_layout.tsx", "frontend/src/hooks/useAuth.ts"]},
+        {"q": "Where is SECRET_KEY read and what is it used for?", "expected": ["backend/app/core/config.py", "backend/app/core/security.py"]},
+        {"q": "What does get_current_active_superuser check?", "expected": ["backend/app/api/deps.py"]},
+        {"q": "Where is FIRST_SUPERUSER_PASSWORD used?", "expected": ["backend/app/core/db.py", "backend/app/core/config.py"]},
+        {"q": "How is Sentry set up?", "expected": ["backend/app/main.py"]},
+        {"q": "What does the /utils/test-email/ endpoint do?", "expected": ["backend/app/api/routes/utils.py"]},
+        {"q": "How does read_items limit results to the current user's items?", "expected": ["backend/app/api/routes/items.py"]},
+        {"q": "How is DATABASE_URL turned into a URL that uses the psycopg driver?", "expected": ["backend/app/core/config.py"]},
+        {"q": "How does update_user_me stop someone taking an email that's already used?", "expected": ["backend/app/api/routes/users.py"]},
+        {"q": "How do I deploy this with Docker Compose and Traefik?", "expected": ["deployment.md", "deployment-docker-compose.md", "compose.deploy.yml"]},
+        {"q": "Where is the useAuth hook's logout implemented?", "expected": ["frontend/src/hooks/useAuth.ts"]}
+      ]
+    },
+    {
+      "name": "fragments",
+      "source": "https://github.com/e2b-dev/fragments",
+      "commit": "3b11c7fcd4dcc37b2f1effde35960cf6ec4bd3c7",
+      "questions": [
+        {"q": "How is generated code run in a sandbox?", "expected": ["app/api/sandbox/route.ts"]},
+        {"q": "How is the model's code answer streamed back as structured data?", "expected": ["app/api/chat/route.ts"]},
+        {"q": "How are users limited in how many requests they can send?", "expected": ["lib/ratelimit.ts", "app/api/chat/route.ts"]},
+        {"q": "How is the system prompt built from the available templates?", "expected": ["lib/prompt.ts"]},
+        {"q": "Which app templates can the user pick, like Next.js or Streamlit?", "expected": ["lib/templates.ts"]},
+        {"q": "How do sign-in and accounts work?", "expected": ["lib/auth.ts", "components/auth.tsx", "lib/supabase.ts", "components/auth-dialog.tsx"]},
+        {"q": "How does sharing a fragment create a short link?", "expected": ["app/actions/publish.ts", "middleware.ts"]},
+        {"q": "How do short links redirect to the running app?", "expected": ["middleware.ts"]},
+        {"q": "How are fast edits applied to existing code instead of regenerating it all?", "expected": ["app/api/morph-chat/route.ts", "lib/morph.ts"]},
+        {"q": "How are disposable email addresses rejected at sign-up?", "expected": ["app/actions/validate-email.ts"]},
+        {"q": "What fields does the model's structured answer contain?", "expected": ["lib/schema.ts"]},
+        {"q": "How does getModelClient pick the provider SDK for a model?", "expected": ["lib/models.ts"]},
+        {"q": "Where is E2B_API_KEY configured?", "expected": [".env.template", "README.md"]},
+        {"q": "What happens when KV_REST_API_URL isn't set?", "expected": ["middleware.ts", "lib/ratelimit.ts", "app/actions/publish.ts"]},
+        {"q": "Where are RATE_LIMIT_MAX_REQUESTS and RATE_LIMIT_WINDOW read?", "expected": ["app/api/chat/route.ts", "app/api/morph-chat/route.ts"]},
+        {"q": "How are API errors turned into responses for the client?", "expected": ["lib/api-errors.ts"]},
+        {"q": "How is the Streamlit sandbox template built?", "expected": ["sandbox-templates/streamlit-developer/template.ts", "sandbox-templates/streamlit-developer/build.prod.ts", "sandbox-templates/streamlit-developer/build.dev.ts"]},
+        {"q": "How do I add a new template of my own?", "expected": ["README.md"]},
+        {"q": "How does the app show the running web app next to the code?", "expected": ["components/fragment-web.tsx", "components/preview.tsx"]},
+        {"q": "Where is the request body for the chat endpoint validated?", "expected": ["lib/request-schema.ts"]}
+      ]
+    }
+  ]
+}

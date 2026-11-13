@@ -1,0 +1,69 @@
+{
+  "description": "Hand-written questions for testing retrieval, each with the files that answer it. Written by reading the code before any retrieval ran on these repos. Questions are phrased the way a newcomer would ask them, mostly without the code's own names, so keyword search gets no free ride. A question counts as found when any expected file appears in the top results.",
+  "repos": [
+    {
+      "name": "markitdown",
+      "source": "https://github.com/microsoft/markitdown",
+      "commit": "ed178952a6672abdfd35b5f9e76a80b6cefc086e",
+      "questions": [
+        {"q": "How does it decide which converter handles a given file?", "expected": ["packages/markitdown/src/markitdown/_markitdown.py"]},
+        {"q": "How are third-party plugins discovered and loaded?", "expected": ["packages/markitdown/src/markitdown/_markitdown.py"]},
+        {"q": "How does it guess the file type when there's no file extension?", "expected": ["packages/markitdown/src/markitdown/_markitdown.py", "packages/markitdown/src/markitdown/_stream_info.py"]},
+        {"q": "How are transcripts pulled from online videos?", "expected": ["packages/markitdown/src/markitdown/converters/_youtube_converter.py"]},
+        {"q": "How does it ask a language model to describe a picture?", "expected": ["packages/markitdown/src/markitdown/converters/_llm_caption.py", "packages/markitdown/src/markitdown/converters/_image_converter.py"]},
+        {"q": "How are spreadsheets turned into markdown tables?", "expected": ["packages/markitdown/src/markitdown/converters/_xlsx_converter.py"]},
+        {"q": "Which library extracts text from PDF documents?", "expected": ["packages/markitdown/src/markitdown/converters/_pdf_converter.py"]},
+        {"q": "How is speech in recordings turned into text?", "expected": ["packages/markitdown/src/markitdown/converters/_transcribe_audio.py", "packages/markitdown/src/markitdown/converters/_audio_converter.py"]},
+        {"q": "What happens when an optional package needed for a format isn't installed?", "expected": ["packages/markitdown/src/markitdown/_exceptions.py"]},
+        {"q": "How are data URIs and file URIs parsed?", "expected": ["packages/markitdown/src/markitdown/_uri_utils.py"]},
+        {"q": "Where are equations in Word documents converted to LaTeX?", "expected": ["packages/markitdown/src/markitdown/converter_utils/docx/math/omml.py", "packages/markitdown/src/markitdown/converter_utils/docx/pre_process.py"]},
+        {"q": "How does it use Azure's cloud document analysis service?", "expected": ["packages/markitdown/src/markitdown/converters/_doc_intel_converter.py"]},
+        {"q": "How are saved Outlook email messages converted?", "expected": ["packages/markitdown/src/markitdown/converters/_outlook_msg_converter.py"]},
+        {"q": "How would I write my own converter as a plugin?", "expected": ["packages/markitdown-sample-plugin/README.md", "packages/markitdown-sample-plugin/src/markitdown_sample_plugin/_plugin.py", "packages/markitdown/README.md"]},
+        {"q": "How does the OCR add-on read text inside images embedded in PDFs?", "expected": ["packages/markitdown-ocr/src/markitdown_ocr/_pdf_converter_with_ocr.py", "packages/markitdown-ocr/src/markitdown_ocr/_ocr_service.py"]},
+        {"q": "How are web page tables and links rewritten as markdown?", "expected": ["packages/markitdown/src/markitdown/converters/_markdownify.py", "packages/markitdown/src/markitdown/converters/_html_converter.py"]},
+        {"q": "How does the command line tool read from standard input and choose where to write?", "expected": ["packages/markitdown/src/markitdown/__main__.py"]},
+        {"q": "How are Jupyter notebooks converted?", "expected": ["packages/markitdown/src/markitdown/converters/_ipynb_converter.py"]},
+        {"q": "How is photo metadata read with an external command-line tool?", "expected": ["packages/markitdown/src/markitdown/converters/_exiftool.py"]},
+        {"q": "How are news feeds in XML converted?", "expected": ["packages/markitdown/src/markitdown/converters/_rss_converter.py"]},
+        {"q": "What does it do with compressed archives containing several files?", "expected": ["packages/markitdown/src/markitdown/converters/_zip_converter.py"]},
+        {"q": "How are slide decks converted, including speaker notes?", "expected": ["packages/markitdown/src/markitdown/converters/_pptx_converter.py"]},
+        {"q": "How do I run the MCP server over HTTP instead of stdio?", "expected": ["packages/markitdown-mcp/src/markitdown_mcp/__main__.py", "packages/markitdown-mcp/README.md"]},
+        {"q": "How are search engine result pages cleaned up?", "expected": ["packages/markitdown/src/markitdown/converters/_bing_serp_converter.py"]},
+        {"q": "How do I install support for every file format at once?", "expected": ["README.md", "packages/markitdown/README.md"]}
+      ]
+    },
+    {
+      "name": "ai-chatbot",
+      "source": "https://github.com/vercel/ai-chatbot",
+      "commit": "a8989b522fa3672a2ae52f053105e40993b36ca1",
+      "questions": [
+        {"q": "How can someone use the app without creating an account?", "expected": ["app/(auth)/api/auth/guest/route.ts", "app/(auth)/auth.ts", "proxy.ts"]},
+        {"q": "How is the assistant's reply streamed back to the browser?", "expected": ["app/(chat)/api/chat/route.ts"]},
+        {"q": "How does a chat pick up again after the page reloads mid-answer?", "expected": ["app/(chat)/api/chat/[id]/stream/route.ts", "hooks/use-auto-resume.ts", "app/(chat)/api/chat/route.ts"]},
+        {"q": "How many messages per day is each kind of user allowed?", "expected": ["lib/ai/entitlements.ts"]},
+        {"q": "Where are chat messages saved to the database?", "expected": ["lib/db/queries.ts"]},
+        {"q": "What tables does the database have for chats and messages?", "expected": ["lib/db/schema.ts", "lib/db/migrations/0000_initial.sql"]},
+        {"q": "How are uploaded attachments stored?", "expected": ["app/(chat)/api/files/upload/route.ts"]},
+        {"q": "How does a new conversation get its title?", "expected": ["lib/ai/generate-title.ts", "app/(chat)/actions.ts"]},
+        {"q": "How does the assistant look up the forecast for a city?", "expected": ["lib/ai/tools/get-weather.ts"]},
+        {"q": "How does the assistant propose edits to a document the user is writing?", "expected": ["lib/ai/tools/request-suggestions.ts"]},
+        {"q": "Which language models can the user choose from?", "expected": ["lib/ai/models.ts", "lib/ai/providers.ts"]},
+        {"q": "How do thumbs up and thumbs down on answers get recorded?", "expected": ["app/(chat)/api/vote/route.ts", "lib/db/queries.ts"]},
+        {"q": "How are passwords hashed when someone signs up?", "expected": ["lib/db/utils.ts", "app/(auth)/actions.ts"]},
+        {"q": "How does Python code from the assistant run inside the browser?", "expected": ["artifacts/code/client.tsx"]},
+        {"q": "How are spreadsheet artifacts generated?", "expected": ["artifacts/sheet/server.ts"]},
+        {"q": "How does the sidebar load older conversations as you scroll?", "expected": ["components/chat/sidebar-history.tsx", "app/(chat)/api/history/route.ts"]},
+        {"q": "What instructions does the assistant get before every conversation?", "expected": ["lib/ai/prompts.ts"]},
+        {"q": "What happens when a user deletes a conversation?", "expected": ["app/(chat)/api/chat/route.ts", "lib/db/queries.ts"]},
+        {"q": "How are database schema changes applied?", "expected": ["lib/db/migrate.ts"]},
+        {"q": "Which settings and secrets must be configured before running it?", "expected": [".env.example", "README.md"]},
+        {"q": "How are requests throttled so one person can't flood the server?", "expected": ["lib/ratelimit.ts", "app/(chat)/api/chat/route.ts"]},
+        {"q": "What happens to a visitor who opens the app without being signed in?", "expected": ["proxy.ts", "app/(auth)/api/auth/guest/route.ts"]},
+        {"q": "How can a chat be made public or private?", "expected": ["hooks/use-chat-visibility.ts", "app/(chat)/actions.ts", "lib/db/queries.ts"]},
+        {"q": "How are errors turned into responses with the right status code?", "expected": ["lib/errors.ts"]},
+        {"q": "How does the editor show the differences between two versions of a document?", "expected": ["lib/editor/diff.js", "components/chat/diffview.tsx"]}
+      ]
+    }
+  ]
+}

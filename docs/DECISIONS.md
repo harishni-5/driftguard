@@ -188,9 +188,34 @@ What this means:
 
 **Resume-safe claims now:** LLM duplicate check 82% precision and recall on held-out data; on 17 fresh repos after one round of fixes, unused dependencies 80%, copied code 74%, and competing HTTP/icon/date libraries 15/15 in product code; "about 600 findings hand-checked across 39 open-source repos (sampled from about 2,600 likely issues), with a public per-finding audit".
 
+## RAG layer (added 2026-11-13)
+
+**Decisions:**
+
+- **Chunk by symbol, not by fixed size.** The parsers already know where every function starts and ends, so chunks are whole functions and doc sections. A fixed window cuts functions in half, and then neither half answers the question.
+- **Hybrid, not vectors alone.** Embeddings miss exact names (an env var, a function from a stack trace), and keywords miss paraphrases. Reciprocal rank fusion needs no score calibration between the two, and it won on the held-out set (85% vs 78% top 5).
+- **No vector database.** A repo is at most tens of thousands of chunks, and a cosine loop over them takes milliseconds. SQLite caches the vectors by content hash. A vector DB would be one more service for nothing.
+- **Free embeddings only.** Ollama `nomic-embed-text` is local and private; Gemini is the cloud option. Auto mode prefers local. `--no-llm` never uses a cloud embedder. Groq has no embedding API.
+- **Keyword-only must still work.** The GitHub Action and machines without Ollama get BM25 alone, never an error.
+- **Tests weigh 0.7.** The one change made after looking at dev results, because test files repeat the words of the code they test. It was fixed before the held-out run.
+- **Audits default to `--embed none`.** Agents retrieve by function names, where keywords are enough, and embedding a big repo on its first run takes minutes. `ask` defaults to `--embed auto`.
+- **Grounded answers.** The model sees numbered, untrusted, secret-masked excerpts, must cite them, and must say when they don't answer the question. Invalid citations are dropped.
+
+**Results:** hybrid search puts a file that answers the question in the top 5 for 85% of 40 held-out questions (keywords 78%, vectors 78%, MRR 0.68). Details are in [how-it-works.md](how-it-works.md#code-search-and-ask-rag).
+
+**Pending:** Pattern-Drift prompt v3 (with retrieved call sites) vs v2 on the held-out labels. It needs a Groq key:
+
+```bash
+java -jar target/driftguard.jar eval eval/pattern-drift-heldout.json --prompt v2,v3 --out eval/results-heldout-rag.md
+```
+
+The agent keeps v2 unless v3 wins.
+
+**Resume line:** "Built a RAG layer (symbol-level chunking, BM25 + embedding hybrid search with reciprocal rank fusion, SQLite vector cache, cited answers) that finds the right file in the top 5 for 85% of held-out questions, vs 78% for either method alone."
+
 ## What hasn't been verified
 
-- **Gemini live:** needs a free key, and it's only been tested against a local fake server. Groq now works live.
+- **Gemini live:** needs a free key, and it's only been tested against a local fake server. That includes Gemini embeddings. Groq now works live.
 - **Whether a stronger free model is actually good enough:** until that's measured, treat similar-function results as leads.
 - **Claude live:** never run, and no longer needed.
 - **Windows:** only run on macOS so far.

@@ -2,6 +2,7 @@ package dev.driftguard.agents;
 
 import dev.driftguard.ingest.RepoSnapshot;
 import dev.driftguard.llm.LlmClient;
+import dev.driftguard.rag.RagIndex;
 import dev.driftguard.store.Database;
 import java.sql.SQLException;
 import java.util.List;
@@ -14,8 +15,15 @@ public interface AuditAgent {
 
     Report run(Context context) throws SQLException;
 
-    /** @param llm null when running without an LLM (--no-llm, or no API key) */
-    record Context(RepoSnapshot snapshot, LlmClient llm, TraceSink traces) {}
+    /**
+     * @param llm null when running without an LLM (--no-llm, or no API key)
+     * @param rag search over the repo's code and docs; null when not built
+     */
+    record Context(RepoSnapshot snapshot, LlmClient llm, TraceSink traces, RagIndex rag) {
+        public Context(RepoSnapshot snapshot, LlmClient llm, TraceSink traces) {
+            this(snapshot, llm, traces, null);
+        }
+    }
 
     /** @param stats numbers for the report and the paper's tables */
     record Report(List<Finding> findings, Map<String, Integer> stats, List<String> warnings) {}

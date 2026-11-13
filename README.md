@@ -25,6 +25,7 @@ Every number below comes from hand-checking findings on public repos the tool wa
 | Groups the LLM confirms as the same job | **82% precision, 82% recall**, vs 52% precision for word similarity alone |
 | Effect of rewriting the prompt | Recall went from **31% to 82%**, and precision went up too |
 | Cost with Groq's free tier | About 1-2k tokens for a small repo, **$0** |
+| Code search (`ask`): right file in the top 5, 40 held-out questions | **85% hybrid**, vs 78% for keywords or vectors alone |
 
 **Static "likely issues", hand-checked on two separate sets of AI-era repos.** The first set (22 repos) found the main false-alarm causes; after fixing them, a second set of 17 repos never used before measured the result:
 
@@ -62,7 +63,21 @@ java -jar target/driftguard.jar audit path/to/your/repo --out report.html
 
 `read -rs` waits for you to paste the key without showing it on screen.
 
-Options: `--out` (`.md`, `.html` or `.json`), `--no-llm`, `--llm` (`groq`, `gemini`, `ollama` or `claude`), `--model`, `--db`.
+Options: `--out` (`.md`, `.html` or `.json`), `--no-llm`, `--llm` (`groq`, `gemini`, `ollama` or `claude`), `--model`, `--embed`, `--db`.
+
+## Ask questions about a repo
+
+`ask` answers questions about any repo from its own code, citing file and line:
+
+```bash
+java -jar target/driftguard.jar ask https://github.com/e2b-dev/fragments "How are users limited in how many requests they can send?"
+```
+
+It splits the repo into functions and doc sections, finds the most relevant ones with hybrid search (BM25 keywords plus embeddings, merged by reciprocal rank fusion), and has the LLM answer only from those excerpts. Citations that don't point at a real excerpt are dropped, and the model is told to say when the excerpts don't answer the question. Without an LLM (`--no-llm`) it prints the matching code.
+
+Embeddings are free: `ollama pull nomic-embed-text` keeps everything local, or a `GEMINI_API_KEY` uses Gemini's free tier. With neither, search uses keywords only. Vectors are cached in SQLite by content hash, so a second run only embeds what changed.
+
+The same search feeds the audit: Pattern-Drift can show the LLM where each similar function is called, and Spec-Drift names the likely new location of a file that a doc points at but that has moved.
 
 ## Use it on pull requests
 
@@ -130,12 +145,12 @@ The audited repo is treated as untrusted:
 ./mvnw test
 ```
 
-121 tests, run on Linux and Windows in CI. They need Python and Node on your PATH but no API key: LLM clients are tested against a local fake server.
+138 tests, run on Linux and Windows in CI. They need Python and Node on your PATH but no API key: LLM clients are tested against a local fake server.
 
 ## Status and limits
 
-Working: ingestion, the three agents, Markdown, HTML and JSON reports, the pull request Action, and the eval harness, for Python and JS/TS.
+Working: ingestion, the three agents, code search and `ask`, Markdown, HTML and JSON reports, the pull request Action, and the eval harnesses, for Python and JS/TS.
 
-Known limits: docs vs code is the least reliable check (see Results); example apps produce most unused-dependency findings in big monorepos; a very large monorepo (CopilotKit) took 20 minutes; functions that do the same job in very different words are missed; Spec-Drift checks concrete things like links and commands, not prose claims like "supports PDF export"; Java repos aren't audited yet. The full list is in [docs/how-it-works.md](docs/how-it-works.md#known-limits).
+Known limits: docs vs code is the least reliable check (see Results); example apps produce most unused-dependency findings in big monorepos; a very large monorepo (CopilotKit) took 20 minutes; functions that do the same job in very different words are missed; Spec-Drift checks concrete things like links and commands, not prose claims like "supports PDF export"; Java repos aren't audited yet; code search misses questions worded very differently from the code ("share a link" vs `publish`). The full list is in [docs/how-it-works.md](docs/how-it-works.md#known-limits).
 
-Built with Java 21, picocli, SQLite and Jackson.
+Built with Java 21, picocli, SQLite and Jackson. Embeddings from Ollama (`nomic-embed-text`) or Gemini; no vector database.

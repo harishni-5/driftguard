@@ -142,10 +142,30 @@ public final class SpecDriftAgent implements AuditAgent {
         stats.put("docsScanned", docs);
         findings.addAll(capped(checks.envVars(claims, stats), "env-var", warnings));
         findings.addAll(capped(checks.scripts(claims, stats), "missing-script", warnings));
-        findings.addAll(capped(checks.paths(claims, stats), "missing-file", warnings));
+        int located = 0;
+        for (Finding finding : capped(checks.paths(claims, stats), "missing-file", warnings)) {
+            Finding withMove = withLikelyMove(finding, snapshot, context.rag());
+            if (withMove != finding) located++;
+            findings.add(withMove);
+        }
+        stats.put("pathsLocated", located);
 
         context.traces().record(new Database.Trace(NAME, 0, "stats", null, null, stats.toString(), null, null, null, null));
         return new Report(findings, stats, warnings);
+    }
+
+    /** Names where a missing file probably moved, from {@link MovedFiles}; the finding itself is unchanged. */
+    private static Finding withLikelyMove(Finding finding, RepoSnapshot snapshot, dev.driftguard.rag.RagIndex rag) {
+        String missing = finding.title().substring(finding.title().indexOf(": ") + 2);
+        return MovedFiles.find(missing, finding.filePath(), snapshot.files(), rag)
+                .map(move -> new Finding(finding.agent(), finding.category(), finding.severity(), finding.confidence(),
+                        finding.decidedBy(), finding.title(), finding.description(), finding.filePath(), finding.startLine(),
+                        finding.evidence(),
+                        (move.exact() ? "A file with this name exists at " : "A similarly named file exists at ") + move.path()
+                                + (move.exact() ? "; it was probably moved. Update the path to it, or remove the reference."
+                                        : "; it may have been renamed. If so, update the path to it."),
+                        finding.fingerprint()))
+                .orElse(finding);
     }
 
     private static List<Finding> capped(List<Finding> findings, String what, List<String> warnings) {

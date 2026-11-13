@@ -6,6 +6,8 @@ import dev.driftguard.ingest.RepoIngestor;
 import dev.driftguard.ingest.RepoSnapshot;
 import dev.driftguard.ingest.RepoSource;
 import dev.driftguard.llm.LlmClient;
+import dev.driftguard.rag.Embedder;
+import dev.driftguard.rag.RagIndex;
 import dev.driftguard.store.Database;
 import java.io.IOException;
 import java.sql.SQLException;
@@ -38,21 +40,33 @@ public final class AuditPipeline {
 
     public static Result run(String input, Database database, LlmClient llm, List<AuditAgent> agents)
             throws IOException, InterruptedException, SQLException {
+        return run(input, database, llm, agents, null, msg -> {});
+    }
+
+    /**
+     * Also builds a search index of the repo for agents that retrieve context: keywords always,
+     * plus vectors when {@code embedder} is given (cached in {@code database}).
+     */
+    public static Result run(String input, Database database, LlmClient llm, List<AuditAgent> agents, Embedder embedder,
+                             java.util.function.Consumer<String> progress)
+            throws IOException, InterruptedException, SQLException {
         long start = System.nanoTime();
         try (RepoSource source = RepoSource.open(input)) {
             RepoSnapshot snapshot = RepoIngestor.ingest(source);
             long repoId = database.saveSnapshot(snapshot);
+            RagIndex rag = RagIndex.build(snapshot, embedder, database, progress);
 
             Map<String, Object> config = new LinkedHashMap<>();
             config.put("agents", agents.stream().map(AuditAgent::name).toList());
             config.put("llmModel", llm == null ? null : llm.model());
+            config.put("retrieval", rag.describe());
             long runId = database.startRun(repoId, VERSION, config);
 
             try {
                 List<Finding> findings = new ArrayList<>();
-                List<String> warnings = new ArrayList<>();
+                List<String> warnings = new ArrayList<>(rag.warnings());
                 Map<String, Map<String, Integer>> stats = new LinkedHashMap<>();
-                AuditAgent.Context context = new AuditAgent.Context(snapshot, llm, trace -> database.saveTrace(runId, trace));
+                AuditAgent.Context context = new AuditAgent.Context(snapshot, llm, trace -> database.saveTrace(runId, trace), rag);
                 for (AuditAgent agent : agents) {
                     AuditAgent.Report report = agent.run(context);
                     findings.addAll(report.findings());
