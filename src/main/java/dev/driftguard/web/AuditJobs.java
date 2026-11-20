@@ -57,10 +57,20 @@ final class AuditJobs implements AutoCloseable {
     }
 
     static final int MAX_QUEUE = 6;
-    static final int KEPT_RESULTS = 12;
+    /** Finished audits kept in memory with their search index. Set DRIFTGUARD_KEEP_RESULTS lower on small hosts. */
+    static final int KEPT_RESULTS = envInt("DRIFTGUARD_KEEP_RESULTS", 12);
     static final long RESULT_TTL_MILLIS = 6 * 60 * 60 * 1000L;
-    /** GitHub reports repo size in KB. Bigger repos take too long for a free 2-CPU machine. */
-    static final long MAX_REPO_KB = 150_000;
+    /** GitHub reports repo size in KB. Set DRIFTGUARD_MAX_REPO_MB lower on hosts with little memory or CPU. */
+    static final long MAX_REPO_KB = envInt("DRIFTGUARD_MAX_REPO_MB", 150) * 1000L;
+
+    static int envInt(String name, int fallback) {
+        try {
+            String value = System.getenv(name);
+            return value == null || value.isBlank() ? fallback : Math.max(1, Integer.parseInt(value.strip()));
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
 
     private final Map<String, Job> jobs = new LinkedHashMap<>();
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {

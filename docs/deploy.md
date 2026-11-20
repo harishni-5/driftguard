@@ -1,29 +1,27 @@
-# Deploy the website for free (Hugging Face Spaces)
+# Deploy the website for free (Render)
 
-A Space is a free container on Hugging Face: 2 CPUs, 16 GB of memory, and a public URL like `https://<you>-driftguard.hf.space`. The Space builds DriftGuard straight from this GitHub repo, so it holds only two files.
+Render's free tier runs the website from this repo's `Dockerfile` with no credit card. You get a public URL like `https://driftguard.onrender.com`.
+
+**Free-tier facts:**
+- 512 MB of memory. DriftGuard peaked at 211 MB auditing markitdown, with a 280 MB heap.
+- A small share of a CPU, so audits take longer than on a laptop.
+- 750 hours a month.
+- The service sleeps after 15 minutes without visitors, and the next visit takes about a minute to wake it.
+- Disk is wiped on restart, so finished audits are rebuilt on demand.
 
 ## Steps
 
-1. Sign up at [huggingface.co](https://huggingface.co/join). It's free; no card needed.
-2. Create a Space: [huggingface.co/new-space](https://huggingface.co/new-space).
-   - Space name: `driftguard`
-   - SDK: **Docker**, template **Blank**
-   - Hardware: **CPU basic (free)**
-   - Visibility: **Public**
-3. Add your keys as **secrets**: Space → **Settings** → **Variables and secrets** → **New secret**.
-   - `GROQ_API_KEY`: from [console.groq.com/keys](https://console.groq.com/keys). Needed for answers.
-   - `GEMINI_API_KEY` (optional): from [aistudio.google.com/apikey](https://aistudio.google.com/apikey). Adds a fallback when Groq is at its limit, and embeddings for better search.
+1. Sign up at [dashboard.render.com/register](https://dashboard.render.com/register) with **GitHub**.
+2. Click **New** → **Blueprint**, connect GitHub, and pick the `driftguard` repo. Render reads [`render.yaml`](../render.yaml).
+3. It asks for the two secret values:
+   - `GROQ_API_KEY`: from [console.groq.com/keys](https://console.groq.com/keys). Answers questions.
+   - `GEMINI_API_KEY`: from [aistudio.google.com/apikey](https://aistudio.google.com/apikey). Fallback answers and embeddings for better search.
+4. Click **Deploy Blueprint**. The first build takes about 5–10 minutes. When the service shows **Live**, open its URL.
 
-   Secrets are never shown to visitors and aren't in the Space's files.
-4. Add the two files: Space → **Files** → **+ Add file** → **Create a new file**.
-   - Name `Dockerfile`, content: [deploy/huggingface/Dockerfile](../deploy/huggingface/Dockerfile). Commit.
-   - Open the existing `README.md`, replace everything with [deploy/huggingface/README.md](../deploy/huggingface/README.md). Commit.
-5. The Space builds (about 5 minutes; watch **Logs**). When it says **Running**, open the **App** tab.
+Every push to `master` redeploys automatically.
 
-To deploy new code, push to GitHub, then Space → **Settings** → **Factory rebuild**.
+## Other hosts
 
-## Good to know
-
-- Free Spaces sleep after 48 hours without visitors and wake on the next visit, which takes about a minute.
-- Disk is wiped on every restart, so finished audits and cached embeddings are lost. They're rebuilt on demand.
-- Every visitor shares your free Groq quota. The server limits each visitor to 30 questions an hour, and everyone together to 400.
+The `Dockerfile` runs anywhere that runs containers. Raise the memory limits (`JAVA_OPTS`, `DRIFTGUARD_MAX_REPO_MB`, `DRIFTGUARD_KEEP_RESULTS`) on bigger machines.
+- **Google Cloud Run:** set **CPU always allocated** and **max instances 1**. Audits run in the background between requests, and the results live in memory.
+- **Hugging Face Spaces:** [deploy/huggingface](../deploy/huggingface) has a Space setup, but Docker Spaces now need a PRO plan.

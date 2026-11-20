@@ -1,0 +1,19 @@
+# Render Blueprint: free web service built from the Dockerfile. https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: driftguard
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      # A free instance has 512 MB and a fraction of a CPU, so keep audits small.
+      - key: DRIFTGUARD_MAX_REPO_MB
+        value: "60"
+      - key: DRIFTGUARD_KEEP_RESULTS
+        value: "4"

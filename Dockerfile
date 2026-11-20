@@ -17,6 +17,8 @@ COPY --from=build /src/target/driftguard.jar /app/driftguard.jar
 # Run as an unprivileged user (uid 1000 is what Hugging Face Spaces expects).
 RUN id -u 1000 >/dev/null 2>&1 || useradd -m -u 1000 app
 USER 1000
-ENV PORT=7860 HOME=/tmp
+# Defaults suit a small free instance (512 MB). On a bigger machine raise MaxRAMPercentage or drop JAVA_OPTS.
+ENV PORT=7860 HOME=/tmp \
+    JAVA_OPTS="-XX:MaxRAMPercentage=55 -XX:+UseSerialGC -Xss512k -XX:TieredStopAtLevel=1 -XX:+ExitOnOutOfMemoryError"
 EXPOSE 7860
-CMD ["java", "-XX:MaxRAMPercentage=70", "-jar", "/app/driftguard.jar", "serve"]
+CMD ["sh", "-c", "exec java $JAVA_OPTS -jar /app/driftguard.jar serve"]

@@ -228,7 +228,7 @@ The same v2 prompt scored 82%/82% on an earlier run and 88%/88% here, at tempera
 - **Query rewriting** fixes the measured weakness of plain retrieval: questions phrased differently from the code. It costs one small LLM call per question and fails safe to the plain question. It also makes follow-up questions work.
 - **General answers are allowed but labeled.** People ask chatbots general questions. Refusing those feels broken, and answering them as if they came from the repo would be dishonest, so they're answered and marked "general knowledge, not from this repo", with no citations.
 - **No separate vector database, and no persistence on the host.** Hugging Face's free disk is wiped on restart, so persisting indexes there buys nothing. SQLite caches vectors while the server runs, and an index takes seconds to rebuild.
-- **Hugging Face Spaces for hosting.** It's free with 16 GB of memory; Render's and Koyeb's free tiers have 512 MB, too little to parse real repos. The Space builds from GitHub, so it holds only two files.
+- **Render for hosting.** Hugging Face Docker Spaces turned out to need a PRO plan (checked 2026-11-20). Google Cloud needs a card, and Cloud Run throttles CPU between requests, which stalls background audits. Render's free tier needs no card. Its 512 MB looked tight, so the server was measured under a 280 MB heap: it peaked at 211 MB across three real repos. The JVM uses the serial GC and a capped heap, and repos over 60 MB are refused there.
 
 **Query rewriting, measured with the small local model** (`qwen2.5:3b` as the rewriter, top 5 / MRR):
 

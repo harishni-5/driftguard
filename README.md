@@ -103,7 +103,7 @@ It's one Java process with no framework: the JDK's built-in HTTP server, a small
 - Groq is tried first, with an automatic fallback to Gemini when Groq hits its per-minute limit
 - every piece of repo text is inserted into the page as text, never HTML, under a strict Content-Security-Policy
 
-`Dockerfile` builds it. [deploy/huggingface](deploy/huggingface) has everything for a free Hugging Face Space ([steps](docs/deploy.md)).
+`Dockerfile` builds it, and [`render.yaml`](render.yaml) deploys it on Render's free tier ([steps](docs/deploy.md)). It peaks at about 210 MB, so it fits a 512 MB free instance.
 
 ## Use it on pull requests
 
