@@ -23,8 +23,9 @@ import java.util.function.Predicate;
  * (keywords' strength) and paraphrased questions (vectors' strength) both find their code.
  *
  * Vectors are cached in SQLite by content hash, so a second run only embeds what changed.
- * Search is a plain loop over the vectors: at repo scale (tens of thousands of chunks)
- * that takes milliseconds, so a vector database would add a service for nothing.
+ * Vector search uses an exact scan for normal repos and switches to an HNSW graph index
+ * (jvector, saved to disk) above {@link #HNSW_THRESHOLD} vectors, where scanning everything
+ * starts to cost. See {@code VectorBenchmark} for the measured trade-off.
  */
 public final class RagIndex {
 
@@ -51,10 +52,10 @@ public final class RagIndex {
     private final List<Chunk> chunks;
     private final Bm25 bm25;
     private final Embedder embedder;
-    private final float[][] vectors; // null when keyword-only; rows null for chunks left unembedded
+    private final VectorIndex vectors; // null when keyword-only
     private final List<String> warnings;
 
-    private RagIndex(List<Chunk> chunks, Bm25 bm25, Embedder embedder, float[][] vectors, List<String> warnings) {
+    private RagIndex(List<Chunk> chunks, Bm25 bm25, Embedder embedder, VectorIndex vectors, List<String> warnings) {
         this.chunks = chunks;
         this.bm25 = bm25;
         this.embedder = embedder;
@@ -71,7 +72,27 @@ public final class RagIndex {
         return build(Chunker.chunk(snapshot), embedder, cache, progress);
     }
 
+    /** How vectors are searched. AUTO is exact for small repos and HNSW for large ones. */
+    public enum VectorStrategy { AUTO, EXACT, HNSW }
+
+    /** Vector count at which AUTO switches from an exact scan to the HNSW graph. */
+    public static final int HNSW_THRESHOLD = 5_000;
+
+    /**
+     * @param strategy how vectors are searched
+     * @param indexDir where HNSW graphs are saved and reused, keyed by model and content; null keeps them in memory only
+     */
+    public static RagIndex build(RepoSnapshot snapshot, Embedder embedder, Database cache, Consumer<String> progress,
+                                 VectorStrategy strategy, java.nio.file.Path indexDir) throws SQLException {
+        return build(Chunker.chunk(snapshot), embedder, cache, progress, strategy, indexDir);
+    }
+
     static RagIndex build(List<Chunk> chunks, Embedder embedder, Database cache, Consumer<String> progress) throws SQLException {
+        return build(chunks, embedder, cache, progress, VectorStrategy.AUTO, null);
+    }
+
+    static RagIndex build(List<Chunk> chunks, Embedder embedder, Database cache, Consumer<String> progress,
+                          VectorStrategy strategy, java.nio.file.Path indexDir) throws SQLException {
         List<String> warnings = java.util.Collections.synchronizedList(new ArrayList<>());
         List<List<String>> documents = new ArrayList<>();
         for (Chunk chunk : chunks) {
@@ -116,7 +137,37 @@ public final class RagIndex {
             warnings.add("Embedding stopped (" + e.getMessage() + "), so search uses keywords only. Vectors made so far are cached.");
             return new RagIndex(chunks, bm25, null, null, warnings);
         }
-        return new RagIndex(chunks, bm25, embedder, vectors, warnings);
+        return new RagIndex(chunks, bm25, embedder, vectorIndex(vectors, shas, embedder.model(), strategy, indexDir, progress, warnings), warnings);
+    }
+
+    /** Exact scan, or an HNSW graph loaded from (or saved to) {@code indexDir}. */
+    static VectorIndex vectorIndex(float[][] vectors, List<String> shas, String model, VectorStrategy strategy,
+                                   java.nio.file.Path indexDir, Consumer<String> progress, List<String> warnings) {
+        int count = 0;
+        for (float[] v : vectors) if (v != null) count++;
+        boolean hnsw = strategy == VectorStrategy.HNSW || (strategy == VectorStrategy.AUTO && count >= HNSW_THRESHOLD);
+        if (!hnsw || count == 0) return new ExactVectorIndex(vectors);
+        // The key covers the model and every embedded chunk's content, so a changed repo never reuses a stale graph.
+        StringBuilder key = new StringBuilder(model);
+        for (int i = 0; i < vectors.length; i++) if (vectors[i] != null) key.append('|').append(i).append(':').append(shas.get(i));
+        java.nio.file.Path dir = indexDir == null ? null : indexDir.resolve(sha256(key.toString()).substring(0, 32));
+        if (dir != null) {
+            java.util.Optional<HnswVectorIndex> saved = HnswVectorIndex.load(dir);
+            if (saved.isPresent()) {
+                progress.accept("loaded the HNSW index from disk (" + count + " vectors)");
+                return saved.get();
+            }
+        }
+        progress.accept("building the HNSW index (" + count + " vectors)");
+        HnswVectorIndex index = HnswVectorIndex.build(vectors);
+        if (dir != null) {
+            try {
+                index.save(dir);
+            } catch (java.io.IOException e) {
+                warnings.add("Couldn't save the vector index (" + e.getMessage() + "); it will be rebuilt next time.");
+            }
+        }
+        return index;
     }
 
     public List<Chunk> chunks() {
@@ -129,7 +180,7 @@ public final class RagIndex {
 
     /** "nomic-embed-text:latest + BM25", or "BM25 only". */
     public String describe() {
-        return hasVectors() ? embedder.model() + " + BM25 (hybrid)" : "BM25 keywords only";
+        return hasVectors() ? embedder.model() + " + BM25 (hybrid, " + vectors.kind() + " vector index)" : "BM25 keywords only";
     }
 
     public List<String> warnings() {
@@ -211,16 +262,7 @@ public final class RagIndex {
     }
 
     private List<Integer> vectorRanking(float[] query, Predicate<Chunk> filter) {
-        float[] q = normalized(query);
-        List<double[]> scored = new ArrayList<>();
-        for (int i = 0; i < vectors.length; i++) {
-            if (vectors[i] == null || vectors[i].length != q.length || !filter.test(chunks.get(i))) continue;
-            double dot = 0;
-            for (int d = 0; d < q.length; d++) dot += q[d] * vectors[i][d];
-            scored.add(new double[] {i, dot});
-        }
-        scored.sort(Comparator.comparingDouble((double[] s) -> -s[1]).thenComparingDouble(s -> s[0]));
-        return scored.stream().map(s -> (int) s[0]).toList();
+        return vectors.nearest(VectorIndex.normalized(query), FUSION_DEPTH, id -> filter.test(chunks.get(id)));
     }
 
     /** A single ranking, reordered by the same prior hybrid uses so all three modes compare fairly. */
@@ -239,13 +281,7 @@ public final class RagIndex {
     }
 
     private static float[] normalized(float[] vector) {
-        double length = 0;
-        for (float v : vector) length += v * v;
-        length = Math.sqrt(length);
-        if (length == 0) return vector;
-        float[] out = new float[vector.length];
-        for (int i = 0; i < vector.length; i++) out[i] = (float) (vector[i] / length);
-        return out;
+        return VectorIndex.normalized(vector);
     }
 
     static String sha256(String text) {

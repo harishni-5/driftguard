@@ -327,6 +327,20 @@ public final class Database implements AutoCloseable {
         return found;
     }
 
+    /** Every cached vector for a model, up to {@code limit}; for benchmarks. */
+    public List<float[]> allEmbeddings(String model, int limit) throws SQLException {
+        List<float[]> out = new java.util.ArrayList<>();
+        try (PreparedStatement query = connection.prepareStatement(
+                "SELECT vector FROM embeddings WHERE model = ? ORDER BY content_sha LIMIT ?")) {
+            query.setString(1, model);
+            query.setInt(2, limit);
+            try (ResultSet result = query.executeQuery()) {
+                while (result.next()) out.add(fromBlob(result.getBytes(1)));
+            }
+        }
+        return out;
+    }
+
     public void saveEmbeddings(String model, Map<String, float[]> vectors) throws SQLException {
         if (vectors.isEmpty()) return;
         String now = java.time.Instant.now().toString();

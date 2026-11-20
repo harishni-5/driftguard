@@ -64,7 +64,10 @@ It reads the repo's Markdown docs (READMEs, `docs/`, and AI-assistant files like
 
 1. **Chunking** (`Chunker`). Python and JS/TS are split along the parser's symbol table: one chunk per outermost function or method, a short header chunk per class, and windows for leftover module code. Docs are split by heading. Other code and config files get 60-line windows with 10 lines of overlap, and functions over 150 lines are windowed too. Templates, synced copies, lockfiles and files over 10,000 lines are left out.
 2. **Keywords** (`Bm25`). Okapi BM25 over identifier-aware tokens: `getUserName` and `get_user_name` both index as `user`, `name` and the whole identifier, plus a light plural trim. Names and paths count double.
-3. **Vectors** (`Embedder`, `HttpEmbedder`). Ollama's `nomic-embed-text` (local, with its `search_document:` and `search_query:` prefixes) or Gemini's `gemini-embedding-001` (768 dimensions, separate query and document modes). Vectors are cached in the `embeddings` table keyed by content hash and model. Search is a brute-force cosine loop, which takes milliseconds at repo scale.
+3. **Vectors** (`Embedder`, `HttpEmbedder`). Ollama's `nomic-embed-text` (local, with its `search_document:` and `search_query:` prefixes) or Gemini's `gemini-embedding-001` (768 dimensions, separate query and document modes). Vectors are cached in the `embeddings` table keyed by content hash and model. Vector search goes through `VectorIndex`:
+   - `ExactVectorIndex` compares the query with every vector (a top-k heap). It's always exactly right, and takes about 1.6 ms for 3,000 vectors.
+   - `HnswVectorIndex` wraps jvector's HNSW-style graph (degree 16, build beam 100, search beam 100). A query walks from an entry point towards closer neighbours, so it scores a few hundred vectors instead of all of them. The graph is written with `OnDiskGraphIndex` and memory-mapped back. The cache key is the model plus every chunk's content hash, so a changed repo never reuses a stale graph.
+   - `AUTO` uses the exact scan up to 5,000 vectors and HNSW above. `eval-rag --vector-index exact|hnsw` forces either.
 4. **Hybrid ranking** (`RagIndex`). Reciprocal rank fusion (k = 60) of the top 100 keyword and vector results. Test files and fixtures get weight 0.7, because they repeat the words of the code they test and crowded it out of "how does X work" answers. If embedding fails, search falls back to keywords with a warning.
 5. **Query rewriting** (`QueryRewriter`, when an LLM is available). One small LLM call turns the question into a standalone question (resolving follow-ups against the last 4 turns) and up to 3 searches in the code's own vocabulary. Each is searched, and the rankings are fused again with RRF, with the original question counting double. If the call fails, search uses the question as typed.
 6. **Answering** (`Answerer`). The top 8 chunks, each clipped to 60 lines and with key-like strings masked, go to the LLM as numbered, untrusted sources (at most 16,000 characters, to fit free-tier limits). The model answers with citations like `[2]` and sets `answerable` to false when the sources don't cover the question. Citations to sources that don't exist are dropped. The last 4 turns of the conversation are included, so follow-ups work. When the sources don't cover a general programming question, the model may answer it briefly, marked as general knowledge, with no citations.
@@ -82,6 +85,20 @@ It reads the repo's Markdown docs (READMEs, `docs/`, and AI-assistant files like
 | Held-out: 40 questions, full-stack-fastapi-template and fragments | 78% | 78% | **85%** | **0.68** |
 
 The dev questions deliberately avoid the code's own names, so vectors win there. The held-out set mixes in questions with names from config and error messages, as real questions have, and hybrid wins. The test-file weight was the only change made after looking at dev results; it raised dev top-5 from 62% to 74% for hybrid. Settings were fixed before the held-out set ran. Per-question ranks: [eval/results-rag-dev.md](../eval/results-rag-dev.md), [eval/results-rag-heldout.md](../eval/results-rag-heldout.md).
+
+### Vector index benchmark
+
+`driftguard bench-vectors` holds out 200 vectors as queries and compares both indexes (8-core Apple Silicon, Java 25):
+
+| Dataset | Vectors | Exact p50 | HNSW p50 | Speed-up | Recall@10 |
+|---|---:|---:|---:|---:|---:|
+| Real code embeddings (nomic-embed-text) | 3,134 | 1.63 ms | 0.17 ms | 9.6× | 100% |
+| Synthetic, clustered | 10,000 | 5.24 ms | 0.19 ms | 27× | 100% |
+| Synthetic, clustered | 50,000 | 26.6 ms | 0.35 ms | 75× | 100% |
+| Synthetic, clustered | 100,000 | 53.5 ms | 0.44 ms | **121×** | 100% |
+| Worst case: random, no clusters | 50,000 | 27.4 ms | 1.00 ms | 27× | **9.7%** |
+
+Exact search grows linearly with size, while HNSW stays under half a millisecond. Real code embeddings are strongly clustered (by file, feature and language), which is where graph indexes excel. The last row is the known failure mode: unstructured high-dimensional vectors leave the graph nothing to navigate by, so recall collapses. It's included so the results aren't only easy cases. End to end, the held-out retrieval test scores the same with either index (85% top 5, MRR 0.68). Full table: [eval/results-vector-benchmark.md](../eval/results-vector-benchmark.md).
 
 ## The website
 

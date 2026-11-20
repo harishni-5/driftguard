@@ -33,6 +33,9 @@ final class RagEvalCommand implements Callable<Integer> {
     @Option(names = "--db", description = "SQLite file that caches embeddings. Default: ${DEFAULT-VALUE}.")
     private Path db = Path.of(System.getProperty("user.home"), ".driftguard", "driftguard.db");
 
+    @Option(names = "--vector-index", description = "auto, exact or hnsw. Default: ${DEFAULT-VALUE}.")
+    private dev.driftguard.rag.RagIndex.VectorStrategy vectorIndex = dev.driftguard.rag.RagIndex.VectorStrategy.AUTO;
+
     @Option(names = "--rewrite", description = "Also score query rewriting with this LLM provider: groq, gemini or ollama. Off by default.")
     private String rewrite;
 
@@ -44,7 +47,7 @@ final class RagEvalCommand implements Callable<Integer> {
             dev.driftguard.llm.LlmClient rewriter = rewrite == null ? null
                     : dev.driftguard.llm.LlmFactory.fromSystem().create(rewrite, null).orElse(null);
             if (rewriter != null) System.out.println("Query rewriting: " + rewriter.model());
-            RetrievalEval.Outcome outcome = RetrievalEval.run(RetrievalEval.read(questions), repoDir, embedder, cache, rewriter,
+            RetrievalEval.Outcome outcome = RetrievalEval.run(RetrievalEval.read(questions), repoDir, embedder, cache, rewriter, vectorIndex,
                     message -> System.err.print("\r" + message + "          "));
             System.err.println();
             Files.writeString(out, RetrievalEval.report(outcome));

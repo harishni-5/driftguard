@@ -2,6 +2,8 @@
 
 **Finds the mess AI coding assistants leave behind.** When different AI sessions write different parts of a codebase, nobody keeps the whole picture. The same job gets solved three ways, libraries pile up, and the docs describe code that has since changed. DriftGuard audits Python and JS/TS repos for that drift and tells you where it is.
 
+**[Try it live →](https://driftguard-4mcp.onrender.com)** Paste a public GitHub repo, see what drifted, and chat with its code. It's on a free server, so the first visit can take about a minute to wake it.
+
 ![DriftGuard HTML report for e2b-dev/fragments](docs/images/report.png)
 
 *A real report. [fragments](https://github.com/e2b-dev/fragments)' README tells you to set `SUPABASE_URL`, but the code reads `NEXT_PUBLIC_SUPABASE_URL`. Following the docs leaves the setting empty. (**[Open the live sample report →](https://harishni-5.github.io/driftguard/sample-report.html)**)*
@@ -26,6 +28,7 @@ Every number below comes from hand-checking findings on public repos the tool wa
 | Effect of rewriting the prompt | Recall went from **31% to 82%**, and precision went up too |
 | Cost with Groq's free tier | About 1-2k tokens for a small repo, **$0** |
 | Code search (`ask`): right file in the top 5, 40 held-out questions | **85% hybrid**, vs 78% for keywords or vectors alone |
+| Vector index (HNSW via jvector) vs exact scan | **121× faster at 100k vectors with 100% recall@10**; 9.6× on real code embeddings |
 
 **Static "likely issues", hand-checked on two separate sets of AI-era repos.** The first set (22 repos) found the main false-alarm causes; after fixing them, a second set of 17 repos never used before measured the result:
 
@@ -82,7 +85,7 @@ The pipeline:
 
 Without an LLM (`--no-llm`) it prints the matching code. `--no-rewrite` searches with the question as typed.
 
-Embeddings are free: `ollama pull nomic-embed-text` keeps everything local, or a `GEMINI_API_KEY` uses Gemini's free tier. With neither, search uses keywords only. Vectors are cached in SQLite by content hash, so a second run only embeds what changed.
+Embeddings are free: `ollama pull nomic-embed-text` keeps everything local, or a `GEMINI_API_KEY` uses Gemini's free tier. With neither, search uses keywords only. Vectors are cached in SQLite by content hash, so a second run only embeds what changed. Up to 5,000 vectors, search scans them all exactly, in about a millisecond. Above that it switches to an **HNSW graph index** ([jvector](https://github.com/jbellis/jvector), the vector index inside Apache Cassandra), which is saved to disk and memory-mapped back on the next run. The benchmark is in `eval/results-vector-benchmark.md`, or run `driftguard bench-vectors`.
 
 The same search feeds the audit: Spec-Drift names the likely new location of a file that a doc points at but that has moved. Giving Pattern-Drift's LLM the retrieved call sites was also tried and measured. It *lowered* recall from 88% to 71%, because callers in different places made real copies look intentional, so it's off ([details](docs/DECISIONS.md#rag-layer-added-2026-11-13)).
 
@@ -171,7 +174,7 @@ The audited repo is treated as untrusted:
 ./mvnw test
 ```
 
-149 tests, run on Linux and Windows in CI. They need Python and Node on your PATH but no API key: LLM clients are tested against a local fake server.
+154 tests, run on Linux and Windows in CI. They need Python and Node on your PATH but no API key: LLM clients are tested against a local fake server.
 
 ## Status and limits
 
@@ -179,4 +182,4 @@ Working: ingestion, the three agents, code search and `ask`, the website, Markdo
 
 Known limits: docs vs code is the least reliable check (see Results); example apps produce most unused-dependency findings in big monorepos; a very large monorepo (CopilotKit) took 20 minutes; functions that do the same job in very different words are missed; Spec-Drift checks concrete things like links and commands, not prose claims like "supports PDF export"; Java repos aren't audited yet; without query rewriting, code search misses questions worded very differently from the code ("share a link" vs `publish`). The full list is in [docs/how-it-works.md](docs/how-it-works.md#known-limits).
 
-Built with Java 21, picocli, SQLite and Jackson, and a dependency-free web front end. Embeddings from Ollama (`nomic-embed-text`) or Gemini; vectors in SQLite, no separate vector database.
+Built with Java 21, picocli, SQLite and Jackson, and a dependency-free web front end. Embeddings from Ollama (`nomic-embed-text`) or Gemini; vectors cached in SQLite and searched by an exact scan or a jvector HNSW index.

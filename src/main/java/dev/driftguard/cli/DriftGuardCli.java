@@ -9,10 +9,10 @@ import picocli.CommandLine.Command;
         mixinStandardHelpOptions = true,
         version = "DriftGuard " + AuditPipeline.VERSION,
         description = "Audits codebases for AI drift.",
-        subcommands = {AuditCommand.class, AskCommand.class, DiffCommand.class, EvalCommand.class, RagEvalCommand.class, ServeCommand.class, DoctorCommand.class})
+        subcommands = {AuditCommand.class, AskCommand.class, DiffCommand.class, EvalCommand.class, RagEvalCommand.class, BenchVectorsCommand.class, ServeCommand.class, DoctorCommand.class})
 public final class DriftGuardCli {
 
     public static void main(String[] args) {
-        System.exit(new CommandLine(new DriftGuardCli()).execute(args));
+        System.exit(new CommandLine(new DriftGuardCli()).setCaseInsensitiveEnumValuesAllowed(true).execute(args));
     }
 }

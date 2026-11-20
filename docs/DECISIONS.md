@@ -245,6 +245,16 @@ java -jar target/driftguard.jar eval-rag eval/rag-questions-heldout.json --rewri
 
 Rewriting stays on in the chatbot anyway, because follow-up questions ("where is it tested?") can't be searched without it. Per-question results: [eval/results-rag-rewrite-qwen-heldout.md](../eval/results-rag-rewrite-qwen-heldout.md), [eval/results-rag-rewrite-qwen-dev.md](../eval/results-rag-rewrite-qwen-dev.md).
 
+## Vector index (added 2026-11-20)
+
+- **An embedded library, not a database server.** jvector runs inside the JVM and writes a file. Qdrant, Pinecone or pgvector would be a second service to host. Free hosting has room for one process, and a repo's index belongs with the repo.
+- **jvector over writing HNSW by hand.** It's maintained, used in production (Apache Cassandra's vector search), and pure Java.
+- **Exact below 5,000 vectors.** At repo scale the exact scan takes about 1.6 ms and is always right. HNSW takes 0.2 ms but costs build time and a file, so it only pays off for big monorepos.
+- **Measured, including the bad case.** 121× faster at 100k with 100% recall@10 on clustered data, 9.6× on real embeddings, and 9.7% recall on unstructured random vectors. The last is why AUTO keeps exact search where it's cheap.
+- **Same results end to end.** The held-out retrieval test scores identically with either index.
+
+**Resume line:** "Added an HNSW vector index (jvector) with on-disk persistence to the RAG pipeline: 121× faster than exact search at 100k vectors with 100% recall@10, benchmarked including the worst case."
+
 ## What hasn't been verified
 
 - **Gemini live:** needs a free key, and it's only been tested against a local fake server. That includes Gemini embeddings. Groq now works live.

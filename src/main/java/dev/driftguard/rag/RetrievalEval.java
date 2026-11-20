@@ -58,14 +58,14 @@ public final class RetrievalEval {
     /** @param repoDir folder of existing clones named after each repo; others are cloned at the pinned commit */
     public static Outcome run(QuestionFile file, Path repoDir, Embedder embedder, Database cache, Consumer<String> progress)
             throws IOException, InterruptedException, SQLException {
-        return run(file, repoDir, embedder, cache, null, progress);
+        return run(file, repoDir, embedder, cache, null, RagIndex.VectorStrategy.AUTO, progress);
     }
 
     public static final String REWRITE = "hybrid+rewrite";
 
     /** @param rewriter when given, also scores search after {@link QueryRewriter} (one LLM call per question) */
     public static Outcome run(QuestionFile file, Path repoDir, Embedder embedder, Database cache,
-                              dev.driftguard.llm.LlmClient rewriter, Consumer<String> progress)
+                              dev.driftguard.llm.LlmClient rewriter, RagIndex.VectorStrategy strategy, Consumer<String> progress)
             throws IOException, InterruptedException, SQLException {
         List<Row> rows = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
@@ -74,7 +74,8 @@ public final class RetrievalEval {
             RagIndex index;
             try (RepoSource source = open(repo, repoDir)) {
                 progress.accept(repo.name() + ": indexing");
-                index = RagIndex.build(RepoIngestor.ingest(source), embedder, cache, m -> progress.accept(repo.name() + ": " + m));
+                index = RagIndex.build(RepoIngestor.ingest(source), embedder, cache, m -> progress.accept(repo.name() + ": " + m),
+                        strategy, null);
             }
             warnings.addAll(index.warnings());
             vectors &= index.hasVectors();

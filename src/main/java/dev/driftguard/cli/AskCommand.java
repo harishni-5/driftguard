@@ -60,7 +60,8 @@ final class AskCommand implements Callable<Integer> {
         try (Database database = Database.open(db); RepoSource source = RepoSource.open(repo)) {
             Embedder embedder = EmbedderFactory.fromSystem().create(noLlm ? localOnly(embed) : embed).orElse(null);
             RepoSnapshot snapshot = RepoIngestor.ingest(source);
-            RagIndex index = RagIndex.build(snapshot, embedder, database, message -> System.err.print("\r" + message + "   "));
+            RagIndex index = RagIndex.build(snapshot, embedder, database, message -> System.err.print("\r" + message + "   "),
+                    RagIndex.VectorStrategy.AUTO, db.toAbsolutePath().getParent().resolve("indexes"));
             if (embedder != null) System.err.println();
             List<RagIndex.Hit> hits = index.search(question, Math.max(1, k));
             System.out.println("Searched " + index.chunks().size() + " chunks with " + index.describe());
