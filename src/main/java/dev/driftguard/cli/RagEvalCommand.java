@@ -33,19 +33,25 @@ final class RagEvalCommand implements Callable<Integer> {
     @Option(names = "--db", description = "SQLite file that caches embeddings. Default: ${DEFAULT-VALUE}.")
     private Path db = Path.of(System.getProperty("user.home"), ".driftguard", "driftguard.db");
 
+    @Option(names = "--rewrite", description = "Also score query rewriting with this LLM provider: groq, gemini or ollama. Off by default.")
+    private String rewrite;
+
     @Override
     public Integer call() {
         try (Database cache = Database.open(db)) {
             Embedder embedder = EmbedderFactory.fromSystem().create(embed).orElse(null);
             System.out.println("Embeddings: " + (embedder == null ? "none, so keyword search only" : embedder.model()));
-            RetrievalEval.Outcome outcome = RetrievalEval.run(RetrievalEval.read(questions), repoDir, embedder, cache,
+            dev.driftguard.llm.LlmClient rewriter = rewrite == null ? null
+                    : dev.driftguard.llm.LlmFactory.fromSystem().create(rewrite, null).orElse(null);
+            if (rewriter != null) System.out.println("Query rewriting: " + rewriter.model());
+            RetrievalEval.Outcome outcome = RetrievalEval.run(RetrievalEval.read(questions), repoDir, embedder, cache, rewriter,
                     message -> System.err.print("\r" + message + "          "));
             System.err.println();
             Files.writeString(out, RetrievalEval.report(outcome));
             for (var entry : outcome.scores().entrySet()) {
                 RetrievalEval.Score s = entry.getValue();
-                System.out.printf(Locale.ROOT, "%-8s found first %d/%d, top 5 %d/%d (%.0f%%), MRR %.2f%n",
-                        entry.getKey().name().toLowerCase(Locale.ROOT), s.hitsAt1(), s.questions(), s.hitsAt5(), s.questions(),
+                System.out.printf(Locale.ROOT, "%-15s found first %d/%d, top 5 %d/%d (%.0f%%), MRR %.2f%n",
+                        entry.getKey(), s.hitsAt1(), s.questions(), s.hitsAt5(), s.questions(),
                         100 * s.hitRate5(), s.mrr());
             }
             outcome.warnings().forEach(w -> System.err.println("warning: " + w));

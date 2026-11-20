@@ -8,6 +8,7 @@ import dev.driftguard.llm.LlmFactory;
 import dev.driftguard.rag.Answerer;
 import dev.driftguard.rag.Embedder;
 import dev.driftguard.rag.EmbedderFactory;
+import dev.driftguard.rag.QueryRewriter;
 import dev.driftguard.rag.RagIndex;
 import dev.driftguard.store.Database;
 import java.io.IOException;
@@ -34,6 +35,9 @@ final class AskCommand implements Callable<Integer> {
 
     @Option(names = "--embed", description = "auto, ollama, gemini or none (keywords only). Default: ${DEFAULT-VALUE}.")
     private String embed = "auto";
+
+    @Option(names = "--no-rewrite", description = "Search with the question as typed, without asking the LLM for better search terms first.")
+    private boolean noRewrite;
 
     @Option(names = "--no-llm", description = "Only search: print the matching code, send nothing to an LLM.")
     private boolean noLlm;
@@ -72,10 +76,18 @@ final class AskCommand implements Callable<Integer> {
                 printHits(hits);
                 return 0;
             }
+            if (!noRewrite) {
+                QueryRewriter.Rewrite rewrite = QueryRewriter.rewrite(llm, question, List.of());
+                if (!rewrite.queries().isEmpty()) {
+                    System.out.println("Also searched for: " + String.join(" | ", rewrite.queries()));
+                    hits = index.search(QueryRewriter.searchTerms(rewrite), Math.max(1, k));
+                }
+            }
             Answerer.Answer answer = Answerer.ask(llm, question, hits);
             System.out.println();
             System.out.println(answer.text());
-            if (!answer.answerable()) System.out.println("\n(The retrieved code didn't fully answer this. Try rephrasing, or raise -k.)");
+            if (answer.generalKnowledge()) System.out.println("\n(General knowledge, not from this repository.)");
+            else if (!answer.answerable()) System.out.println("\n(The retrieved code didn't fully answer this. Try rephrasing, or raise -k.)");
             System.out.println("\nSources:");
             List<Integer> listed = answer.cited().isEmpty()
                     ? java.util.stream.IntStream.rangeClosed(1, answer.shown().size()).boxed().toList() : answer.cited();

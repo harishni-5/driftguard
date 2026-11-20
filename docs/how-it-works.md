@@ -66,7 +66,8 @@ It reads the repo's Markdown docs (READMEs, `docs/`, and AI-assistant files like
 2. **Keywords** (`Bm25`). Okapi BM25 over identifier-aware tokens: `getUserName` and `get_user_name` both index as `user`, `name` and the whole identifier, plus a light plural trim. Names and paths count double.
 3. **Vectors** (`Embedder`, `HttpEmbedder`). Ollama's `nomic-embed-text` (local, with its `search_document:` and `search_query:` prefixes) or Gemini's `gemini-embedding-001` (768 dimensions, separate query and document modes). Vectors are cached in the `embeddings` table keyed by content hash and model. Search is a brute-force cosine loop, which takes milliseconds at repo scale.
 4. **Hybrid ranking** (`RagIndex`). Reciprocal rank fusion (k = 60) of the top 100 keyword and vector results. Test files and fixtures get weight 0.7, because they repeat the words of the code they test and crowded it out of "how does X work" answers. If embedding fails, search falls back to keywords with a warning.
-5. **Answering** (`Answerer`). The top 8 chunks, each clipped to 60 lines and with key-like strings masked, go to the LLM as numbered, untrusted sources (at most 16,000 characters, to fit free-tier limits). The model answers with citations like `[2]` and sets `answerable` to false when the sources don't cover the question. Citations to sources that don't exist are dropped.
+5. **Query rewriting** (`QueryRewriter`, when an LLM is available). One small LLM call turns the question into a standalone question (resolving follow-ups against the last 4 turns) and up to 3 searches in the code's own vocabulary. Each is searched, and the rankings are fused again with RRF, with the original question counting double. If the call fails, search uses the question as typed.
+6. **Answering** (`Answerer`). The top 8 chunks, each clipped to 60 lines and with key-like strings masked, go to the LLM as numbered, untrusted sources (at most 16,000 characters, to fit free-tier limits). The model answers with citations like `[2]` and sets `answerable` to false when the sources don't cover the question. Citations to sources that don't exist are dropped. The last 4 turns of the conversation are included, so follow-ups work. When the sources don't cover a general programming question, the model may answer it briefly, marked as general knowledge, with no citations.
 
 **In the agents:**
 
@@ -81,6 +82,24 @@ It reads the repo's Markdown docs (READMEs, `docs/`, and AI-assistant files like
 | Held-out: 40 questions, full-stack-fastapi-template and fragments | 78% | 78% | **85%** | **0.68** |
 
 The dev questions deliberately avoid the code's own names, so vectors win there. The held-out set mixes in questions with names from config and error messages, as real questions have, and hybrid wins. The test-file weight was the only change made after looking at dev results; it raised dev top-5 from 62% to 74% for hybrid. Settings were fixed before the held-out set ran. Per-question ranks: [eval/results-rag-dev.md](../eval/results-rag-dev.md), [eval/results-rag-heldout.md](../eval/results-rag-heldout.md).
+
+## The website
+
+`driftguard serve` (`dev.driftguard.web`) is one Java process: the JDK's built-in `HttpServer`, no web framework.
+
+| Route | Does |
+|---|---|
+| `GET /` | the single page (`src/main/resources/web/`) |
+| `POST /api/audit` | `{"repo": url}` → queues an audit, returns its id. A recent audit of the same repo is reused. |
+| `GET /api/audit/{id}` | status, progress text, queue position; when done, the JSON report plus index stats |
+| `GET /report/{id}` | the full HTML report, under a CSP that blocks all scripts |
+| `POST /api/ask` | `{"id", "question", "history"}` → rewritten searches, answer, and the sources with GitHub links |
+
+- **Audits** run on one worker thread, from a queue of at most 6, as static analysis only, so they're fast and use no LLM quota. Results and their search indexes stay in memory for 6 hours (at most 12).
+- **Input checks:** only `github.com/owner/name` URLs (any link inside a repo is trimmed to the repo); GitHub's API is asked first and private, missing or over-150 MB repos are refused; JSON bodies only, at most 16 KB; questions at most 500 characters.
+- **Limits:** 6 audits and 30 questions per visitor per hour, and 60 audits and 400 questions overall (`RateLimiter`, a sliding window keyed by the first `X-Forwarded-For` address).
+- **LLM:** in auto mode every free cloud provider with a key is chained (`FallbackLlmClient`): Groq first, then Gemini when Groq hits a limit.
+- **Front end:** plain HTML, CSS and JavaScript with no build step. Every value from a repo is inserted with `textContent`. Answers are rendered with a small Markdown subset (paragraphs, lists, `code`, bold and `[n]` citations that open the cited source).
 
 ## Measuring accuracy
 
@@ -102,15 +121,17 @@ The labels are one person's judgment. The line between "same job" and "same shap
 
 ```
 src/main/java/dev/driftguard/
-  cli/        picocli commands (audit, ask, diff, eval, eval-rag, doctor)
+  cli/        picocli commands (audit, ask, serve, diff, eval, eval-rag, doctor)
   ingest/     clone or open a repo, walk files, run the parser helpers
   manifest/   read requirements.txt, pyproject.toml, Pipfile, setup.py, setup.cfg, package.json
   agents/     AuditAgent interface, Finding, and one package per agent
   llm/        LlmClient interface, provider selection, OpenAI-format client (Groq, Gemini, Ollama), Claude client
-  rag/        chunking, BM25, embeddings, hybrid search, answering with citations, retrieval eval
+  rag/        chunking, BM25, embeddings, hybrid search, query rewriting, answering with citations, retrieval eval
+  web/        the website: HTTP server, audit queue, rate limits, GitHub URL checks
   store/      all SQLite access, including the embedding cache
   report/     Markdown, HTML and JSON output, and the pull request comment
 src/main/resources/
+  web/        the single-page front end (HTML, CSS, plain JavaScript)
   helpers/    parser subprocesses: Python (ast) and Node (vendored Babel)
   db/         schema.sql
   knowledge/  PyPI name to import name table

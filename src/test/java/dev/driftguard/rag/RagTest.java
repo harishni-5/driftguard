@@ -219,7 +219,7 @@ class RagTest {
     void answersCiteRealSourcesOnlyAndMaskSecrets() throws Exception {
         RagIndex index = RagIndex.build(repo(Map.of("app/auth.py", AUTH,
                 "app/keys.py", "def client():\n    key = \"FAKE0TEST0VALUE0abcdefghijklmn\"\n    return connect(key)\n")), null, null, m -> {});
-        FakeLlm llm = new FakeLlm(new Answerer.Reply("Emails are checked by validate_email [1], see also [9].", List.of(1, 9), true));
+        FakeLlm llm = new FakeLlm(new Answerer.Reply("Emails are checked by validate_email [1], see also [9].", List.of(1, 9), true, false));
 
         Answerer.Answer answer = Answerer.ask(llm, "how is the email checked? and the client key", index.search("email client key", 5));
 
@@ -233,7 +233,7 @@ class RagTest {
     @Test
     void unanswerableRepliesAreFlagged() throws Exception {
         RagIndex index = RagIndex.build(repo(Map.of("app/auth.py", AUTH)), null, null, m -> {});
-        FakeLlm llm = new FakeLlm(new Answerer.Reply("The excerpts don't show billing.", List.of(), false));
+        FakeLlm llm = new FakeLlm(new Answerer.Reply("The excerpts don't show billing.", List.of(), false, false));
 
         assertFalse(Answerer.ask(llm, "how does billing work?", index.search("email", 3)).answerable());
     }
@@ -325,5 +325,69 @@ class RagTest {
         assertEquals("app/auth.py", hits.get(0).chunk().path(), "the code outranks its test: " + hits);
         assertEquals(1, RetrievalEval.rankOfFirstRelevant(hits, List.of("app/auth.py")));
         assertEquals(0, RetrievalEval.rankOfFirstRelevant(hits, List.of("nowhere.py")));
+    }
+
+    // ---- query rewriting and conversation ---------------------------------------------------
+
+    private static final class RewriteLlm implements LlmClient {
+        final Object reply;
+        final String failWith;
+        final List<String> users = new ArrayList<>();
+
+        RewriteLlm(Object reply, String failWith) {
+            this.reply = reply;
+            this.failWith = failWith;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T> Result<T> structured(String system, String user, Class<T> type) throws LlmException {
+            users.add(user);
+            if (failWith != null) throw new LlmException(failWith);
+            return new Result<>((T) reply, 50, 10, 0, 1);
+        }
+
+        @Override
+        public String model() {
+            return "fake";
+        }
+    }
+
+    @Test
+    void rewritingFindsCodeThatUsesDifferentWords() throws Exception {
+        RagIndex index = RagIndex.build(repo(Map.of("app/auth.py", AUTH, "app/share.py",
+                "def publish(url, ttl):\n    key = nanoid()\n    kv.set(key, url, ex=ttl)\n    return key\n")), null, null, m -> {});
+        assertTrue(index.search("how does sharing make a short link", 5).stream().noneMatch(h -> h.chunk().name().equals("publish")),
+                "plain keyword search misses it");
+
+        RewriteLlm llm = new RewriteLlm(new QueryRewriter.Rewrite("How does sharing make a short link?",
+                List.of("publish url kv set", "nanoid short id", "share link", "fourth query is dropped")), null);
+        QueryRewriter.Rewrite rewrite = QueryRewriter.rewrite(llm, "how does sharing make a short link", List.of());
+        assertEquals(3, rewrite.queries().size());
+        assertEquals("publish", index.search(QueryRewriter.searchTerms(rewrite), 3).get(0).chunk().name());
+    }
+
+    @Test
+    void followUpsCarryTheConversationAndFailuresFallBack() {
+        RewriteLlm llm = new RewriteLlm(new QueryRewriter.Rewrite("Where is validate_email tested?", List.of("test_validate_email")), null);
+        QueryRewriter.rewrite(llm, "where is it tested?", List.of(new QueryRewriter.Turn("how are emails validated?", "By validate_email [1].")));
+        assertTrue(llm.users.get(0).contains("<conversation>") && llm.users.get(0).contains("validate_email"), llm.users.get(0));
+
+        QueryRewriter.Rewrite fallback = QueryRewriter.rewrite(new RewriteLlm(null, "HTTP 429"), "where is it?", List.of());
+        assertEquals("where is it?", fallback.standalone());
+        assertTrue(fallback.queries().isEmpty());
+    }
+
+    @Test
+    void generalAnswersAreLabeledAndCiteNothing() throws Exception {
+        RagIndex index = RagIndex.build(repo(Map.of("app/auth.py", AUTH)), null, null, m -> {});
+        FakeLlm llm = new FakeLlm(new Answerer.Reply("A hash is a one-way function [1].", List.of(1), false, true));
+
+        Answerer.Answer answer = Answerer.ask(llm, "what is hashing?", index.search("hash", 3),
+                List.of(new QueryRewriter.Turn("earlier question", "earlier answer")));
+        assertTrue(answer.generalKnowledge());
+        assertTrue(answer.cited().isEmpty(), "general knowledge never cites repo code");
+        assertTrue(llm.user.contains("<conversation>") && llm.user.contains("earlier answer"));
+        assertTrue(llm.system.contains("General knowledge") || llm.system.contains("general knowledge"));
     }
 }

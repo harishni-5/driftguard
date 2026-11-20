@@ -72,7 +72,7 @@ public final class RagIndex {
     }
 
     static RagIndex build(List<Chunk> chunks, Embedder embedder, Database cache, Consumer<String> progress) throws SQLException {
-        List<String> warnings = new ArrayList<>();
+        List<String> warnings = java.util.Collections.synchronizedList(new ArrayList<>());
         List<List<String>> documents = new ArrayList<>();
         for (Chunk chunk : chunks) {
             List<String> tokens = new ArrayList<>(Tokens.of(chunk.indexText()));
@@ -139,6 +139,32 @@ public final class RagIndex {
     /** Hybrid when vectors exist, keywords otherwise. */
     public List<Hit> search(String query, int k) {
         return search(query, k, hasVectors() ? Mode.HYBRID : Mode.KEYWORD, chunk -> true);
+    }
+
+    /**
+     * Searches with several phrasings of one question (from {@link QueryRewriter}) and merges the
+     * rankings with reciprocal rank fusion. The first query, the question itself, counts double, so
+     * rewrites can add results but rarely push out what the plain question found.
+     */
+    public List<Hit> search(List<String> queries, int k) {
+        if (queries.size() == 1) return search(queries.get(0), k);
+        Map<Integer, Double> fused = new HashMap<>();
+        Map<Integer, Hit> best = new HashMap<>();
+        for (int q = 0; q < queries.size(); q++) {
+            double weight = q == 0 ? 2.0 : 1.0;
+            List<Hit> hits = search(queries.get(q), FUSION_DEPTH);
+            for (int r = 0; r < hits.size(); r++) {
+                int id = hits.get(r).chunk().id();
+                fused.merge(id, weight / (RRF_K + r + 1), Double::sum);
+                best.putIfAbsent(id, hits.get(r));
+            }
+        }
+        return fused.entrySet().stream()
+                .sorted(Map.Entry.<Integer, Double>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
+                .limit(k)
+                .map(e -> new Hit(best.get(e.getKey()).chunk(), e.getValue(), best.get(e.getKey()).keywordRank(),
+                        best.get(e.getKey()).vectorRank()))
+                .toList();
     }
 
     public List<Hit> search(String query, int k, Mode mode, Predicate<Chunk> filter) {

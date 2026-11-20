@@ -1,0 +1,9 @@
+target
+private-backup
+.git
+.claude
+*.db
+*.db-shm
+*.db-wal
+eval
+docs

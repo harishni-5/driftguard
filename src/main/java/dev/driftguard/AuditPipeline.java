@@ -34,7 +34,8 @@ public final class AuditPipeline {
             List<String> warnings,
             Database.RunCost cost,
             long durationMs,
-            String llmModel) {}
+            String llmModel,
+            RagIndex rag) {}
 
     private AuditPipeline() {}
 
@@ -79,7 +80,7 @@ public final class AuditPipeline {
                 database.saveFindings(runId, findings);
                 long durationMs = (System.nanoTime() - start) / 1_000_000;
                 database.finishRun(runId, "COMPLETED", durationMs);
-                return new Result(snapshot, runId, findings, stats, warnings, database.runCost(runId), durationMs, llm == null ? null : llm.model());
+                return new Result(snapshot, runId, findings, stats, warnings, database.runCost(runId), durationMs, llm == null ? null : llm.model(), rag);
             } catch (SQLException | RuntimeException e) {
                 database.finishRun(runId, "FAILED", (System.nanoTime() - start) / 1_000_000);
                 throw e;

@@ -216,6 +216,35 @@ The same v2 prompt scored 82%/82% on an earlier run and 88%/88% here, at tempera
 
 **Resume line:** "Built a RAG layer (symbol-level chunking, BM25 + embedding hybrid search with reciprocal rank fusion, SQLite vector cache, cited answers) that finds the right file in the top 5 for 85% of held-out questions, vs 78% for either method alone."
 
+## Website and chatbot (added 2026-11-20)
+
+**Decisions:**
+
+- **No web framework.** The JDK's `HttpServer` covers five routes. Spring or Javalin would add megabytes and a learning curve to save about 100 lines.
+- **No front-end framework or build step.** One page of plain JavaScript that inserts all repo text with `textContent`. Nothing to compile, and no dependency can ship an XSS hole.
+- **Audits are static-only on the website.** They finish in seconds and use no LLM quota, which is kept for questions, where it matters most.
+- **One worker, short queue.** A free 2-CPU machine can't audit several repos at once without every one slowing down. A full queue says "busy, try again" instead of hanging.
+- **Free LLMs chained.** Groq first, then Gemini when Groq hits its per-minute limit (`FallbackLlmClient`). One free quota runs out quickly on a public site; two rarely run out at once.
+- **Query rewriting** fixes the measured weakness of plain retrieval: questions phrased differently from the code. It costs one small LLM call per question and fails safe to the plain question. It also makes follow-up questions work.
+- **General answers are allowed but labeled.** People ask chatbots general questions. Refusing those feels broken, and answering them as if they came from the repo would be dishonest, so they're answered and marked "general knowledge, not from this repo", with no citations.
+- **No separate vector database, and no persistence on the host.** Hugging Face's free disk is wiped on restart, so persisting indexes there buys nothing. SQLite caches vectors while the server runs, and an index takes seconds to rebuild.
+- **Hugging Face Spaces for hosting.** It's free with 16 GB of memory; Render's and Koyeb's free tiers have 512 MB, too little to parse real repos. The Space builds from GitHub, so it holds only two files.
+
+**Query rewriting, measured with the small local model** (`qwen2.5:3b` as the rewriter, top 5 / MRR):
+
+| Set | Hybrid | Hybrid + rewrite |
+|---|---:|---:|
+| Dev, 50 questions | 74% / 0.54 | **80%** / 0.56 |
+| Held-out, 40 questions | **85%** / 0.68 | 83% / 0.66 |
+
+Mixed: up 6 points on dev, down one question on held-out. On held-out it rescued "how does sharing create a short link" (not found → rank 8) and "how do short links redirect" (5 → 1), but lost two others to off-target rewrites. A 3B model is a weak rewriter; the website uses Groq's 120B model, which needs a key to measure:
+
+```bash
+java -jar target/driftguard.jar eval-rag eval/rag-questions-heldout.json --rewrite groq --out eval/results-rag-rewrite-groq-heldout.md
+```
+
+Rewriting stays on in the chatbot anyway, because follow-up questions ("where is it tested?") can't be searched without it. Per-question results: [eval/results-rag-rewrite-qwen-heldout.md](../eval/results-rag-rewrite-qwen-heldout.md), [eval/results-rag-rewrite-qwen-dev.md](../eval/results-rag-rewrite-qwen-dev.md).
+
 ## What hasn't been verified
 
 - **Gemini live:** needs a free key, and it's only been tested against a local fake server. That includes Gemini embeddings. Groq now works live.

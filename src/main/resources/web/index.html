@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DriftGuard</title>
+  <meta name="description" content="Audit a GitHub repo for the drift AI coding leaves behind, then ask questions about its code.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="DriftGuard home">
+      <img src="/favicon.svg" alt="" width="26" height="26">
+      <span>DriftGuard</span>
+    </a>
+    <nav>
+      <a href="https://harishni-5.github.io/driftguard/" target="_blank" rel="noopener">How it works</a>
+      <a href="https://github.com/harishni-5/driftguard" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="hero" class="hero">
+      <h1>Find the drift AI coding leaves behind</h1>
+      <p class="lede">Paste a public GitHub repo. DriftGuard finds the same job done three ways, unused dependencies and docs that no longer match the code. Then ask the code anything.</p>
+      <form id="audit-form" class="repo-form" autocomplete="off">
+        <label for="repo-input" class="sr-only">GitHub repository URL</label>
+        <input id="repo-input" name="repo" type="text" inputmode="url" spellcheck="false"
+               placeholder="https://github.com/owner/repo" required>
+        <button type="submit" id="audit-button">Audit</button>
+      </form>
+      <p id="form-error" class="form-error" role="alert" hidden></p>
+      <div class="examples">
+        <span>Try:</span>
+        <button type="button" class="chip" data-repo="https://github.com/e2b-dev/fragments">e2b-dev/fragments</button>
+        <button type="button" class="chip" data-repo="https://github.com/vercel/ai-chatbot">vercel/ai-chatbot</button>
+        <button type="button" class="chip" data-repo="https://github.com/microsoft/markitdown">microsoft/markitdown</button>
+      </div>
+      <ul class="features">
+        <li><strong>Pattern-Drift</strong> copied code, competing libraries, functions doing the same job</li>
+        <li><strong>Spec-Drift</strong> broken doc links, missing scripts, wrong variable names</li>
+        <li><strong>Dead-Dep</strong> dependencies nothing imports</li>
+        <li><strong>Ask</strong> answers from the repo's own code, with file and line citations</li>
+      </ul>
+    </section>
+
+    <section id="progress" class="panel progress" hidden aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <div>
+        <h2 id="progress-repo"></h2>
+        <p id="progress-text"></p>
+      </div>
+    </section>
+
+    <section id="results" hidden>
+      <div class="repo-head">
+        <div>
+          <h2><a id="repo-link" target="_blank" rel="noopener"></a></h2>
+          <p id="repo-meta" class="muted"></p>
+        </div>
+        <div class="head-actions">
+          <a id="report-link" class="button-secondary" target="_blank" rel="noopener">Full report</a>
+          <button type="button" id="new-audit" class="button-secondary">New audit</button>
+        </div>
+      </div>
+
+      <div class="stats" id="stats"></div>
+
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tab-findings" aria-selected="true" aria-controls="findings-pane">Findings</button>
+        <button role="tab" id="tab-ask" aria-selected="false" aria-controls="ask-pane">Ask the code</button>
+      </div>
+
+      <div class="workspace">
+        <section id="findings-pane" class="pane" role="tabpanel" aria-labelledby="tab-findings">
+          <div class="filters" id="filters">
+            <button type="button" class="chip active" data-filter="likely">Likely issues</button>
+            <button type="button" class="chip" data-filter="review">Needs review</button>
+            <button type="button" class="chip" data-filter="all">All</button>
+          </div>
+          <div id="findings"></div>
+        </section>
+
+        <section id="ask-pane" class="pane ask" role="tabpanel" aria-labelledby="tab-ask">
+          <div class="ask-head">
+            <h3>Ask the code</h3>
+            <p id="search-meta" class="muted"></p>
+          </div>
+          <div id="chat" class="chat">
+            <div class="chat-empty" id="chat-empty">
+              <p>Questions are answered only from this repo's code, with sources you can open.</p>
+              <div class="suggestions" id="suggestions"></div>
+            </div>
+          </div>
+          <form id="ask-form" class="ask-form" autocomplete="off">
+            <label for="question" class="sr-only">Your question</label>
+            <textarea id="question" rows="1" maxlength="500" placeholder="How does authentication work?" required></textarea>
+            <button type="submit" id="ask-button" aria-label="Ask">Ask</button>
+          </form>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Static analysis runs on a free server, so audits of big repos are refused. Answers come from a free LLM and can be wrong: check the cited sources. Code from public repos only.</p>
+  </footer>
+</body>
+</html>

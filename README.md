@@ -73,11 +73,37 @@ Options: `--out` (`.md`, `.html` or `.json`), `--no-llm`, `--llm` (`groq`, `gemi
 java -jar target/driftguard.jar ask https://github.com/e2b-dev/fragments "How are users limited in how many requests they can send?"
 ```
 
-It splits the repo into functions and doc sections, finds the most relevant ones with hybrid search (BM25 keywords plus embeddings, merged by reciprocal rank fusion), and has the LLM answer only from those excerpts. Citations that don't point at a real excerpt are dropped, and the model is told to say when the excerpts don't answer the question. Without an LLM (`--no-llm`) it prints the matching code.
+The pipeline:
+
+1. **Chunk** the repo into functions and doc sections, using the parsers' symbol table.
+2. **Rewrite** the question with the LLM into a standalone question plus up to 3 searches in the code's own vocabulary. "How does sharing make a short link?" also searches `publish url kv`. Follow-ups like "where is it tested?" are resolved against the conversation.
+3. **Retrieve** with hybrid search (BM25 keywords plus embeddings, merged by reciprocal rank fusion), then fuse the results of every rewritten query.
+4. **Answer** only from the top excerpts, citing them as `[1]`, `[2]`. Citations to excerpts that don't exist are dropped. When the code doesn't cover a question, the model says so, and a general programming question gets a short answer labeled *general knowledge, not from this repo*.
+
+Without an LLM (`--no-llm`) it prints the matching code. `--no-rewrite` searches with the question as typed.
 
 Embeddings are free: `ollama pull nomic-embed-text` keeps everything local, or a `GEMINI_API_KEY` uses Gemini's free tier. With neither, search uses keywords only. Vectors are cached in SQLite by content hash, so a second run only embeds what changed.
 
 The same search feeds the audit: Spec-Drift names the likely new location of a file that a doc points at but that has moved. Giving Pattern-Drift's LLM the retrieved call sites was also tried and measured. It *lowered* recall from 88% to 71%, because callers in different places made real copies look intentional, so it's off ([details](docs/DECISIONS.md#rag-layer-added-2026-11-13)).
+
+## Website
+
+`serve` runs DriftGuard as a website: paste a public GitHub URL, watch the audit, browse the findings (each linked to the exact line on GitHub), and chat with the code in a side panel that keeps the conversation.
+
+```bash
+read -rs GROQ_API_KEY && export GROQ_API_KEY
+java -jar target/driftguard.jar serve        # http://localhost:7860
+```
+
+It's one Java process with no framework: the JDK's built-in HTTP server, a small JSON API (`POST /api/audit`, `GET /api/audit/{id}`, `POST /api/ask`, `GET /report/{id}`) and a single page written in plain JavaScript. To keep a public deployment safe and free:
+
+- only `github.com` URLs are accepted, and repos over 150 MB are refused before cloning
+- audits run one at a time, from a short queue, as static analysis only
+- the LLM is used for questions, with per-visitor and overall hourly limits
+- Groq is tried first, with an automatic fallback to Gemini when Groq hits its per-minute limit
+- every piece of repo text is inserted into the page as text, never HTML, under a strict Content-Security-Policy
+
+`Dockerfile` builds it. [deploy/huggingface](deploy/huggingface) has everything for a free Hugging Face Space ([steps](docs/deploy.md)).
 
 ## Use it on pull requests
 
@@ -145,12 +171,12 @@ The audited repo is treated as untrusted:
 ./mvnw test
 ```
 
-138 tests, run on Linux and Windows in CI. They need Python and Node on your PATH but no API key: LLM clients are tested against a local fake server.
+149 tests, run on Linux and Windows in CI. They need Python and Node on your PATH but no API key: LLM clients are tested against a local fake server.
 
 ## Status and limits
 
-Working: ingestion, the three agents, code search and `ask`, Markdown, HTML and JSON reports, the pull request Action, and the eval harnesses, for Python and JS/TS.
+Working: ingestion, the three agents, code search and `ask`, the website, Markdown, HTML and JSON reports, the pull request Action, and the eval harnesses, for Python and JS/TS.
 
-Known limits: docs vs code is the least reliable check (see Results); example apps produce most unused-dependency findings in big monorepos; a very large monorepo (CopilotKit) took 20 minutes; functions that do the same job in very different words are missed; Spec-Drift checks concrete things like links and commands, not prose claims like "supports PDF export"; Java repos aren't audited yet; code search misses questions worded very differently from the code ("share a link" vs `publish`). The full list is in [docs/how-it-works.md](docs/how-it-works.md#known-limits).
+Known limits: docs vs code is the least reliable check (see Results); example apps produce most unused-dependency findings in big monorepos; a very large monorepo (CopilotKit) took 20 minutes; functions that do the same job in very different words are missed; Spec-Drift checks concrete things like links and commands, not prose claims like "supports PDF export"; Java repos aren't audited yet; without query rewriting, code search misses questions worded very differently from the code ("share a link" vs `publish`). The full list is in [docs/how-it-works.md](docs/how-it-works.md#known-limits).
 
-Built with Java 21, picocli, SQLite and Jackson. Embeddings from Ollama (`nomic-embed-text`) or Gemini; no vector database.
+Built with Java 21, picocli, SQLite and Jackson, and a dependency-free web front end. Embeddings from Ollama (`nomic-embed-text`) or Gemini; vectors in SQLite, no separate vector database.
