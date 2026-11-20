@@ -10,11 +10,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.CleanupMode;
 import org.junit.jupiter.api.io.TempDir;
 
 class VectorIndexTest {
 
-    @TempDir
+    // HNSW graphs are memory-mapped, and Windows can't delete a mapped file until the JVM releases the
+    // mapping at garbage collection. The files are only temporary, so leave them for the OS to clean up.
+    @TempDir(cleanup = CleanupMode.NEVER)
     Path dir;
 
     private static float[][] data(int n, int dimension) {
