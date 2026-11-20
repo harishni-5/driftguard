@@ -74,7 +74,8 @@ public final class EmbedderFactory {
     }
 
     private Embedder gemini() {
-        return new HttpEmbedder(HttpEmbedder.Style.GEMINI, GEMINI_URL, env.apply("GEMINI_API_KEY"), GEMINI_MODEL, "", "", 50, true);
+        // Gemini's free tier allows about 100 embedding texts a minute; stay safely under it.
+        return new HttpEmbedder(HttpEmbedder.Style.GEMINI, GEMINI_URL, env.apply("GEMINI_API_KEY"), GEMINI_MODEL, "", "", 25, true, 80);
     }
 
     /** An installed Ollama model with "embed" in its name, preferring nomic-embed-text. */

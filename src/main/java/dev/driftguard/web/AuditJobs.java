@@ -49,6 +49,8 @@ final class AuditJobs implements AutoCloseable {
         volatile String html;
         volatile String commit;
         volatile RagIndex rag;
+        /** Semantic search state: "off", "building: ...", "ready", or "unavailable: reason". */
+        volatile String vectors = "off";
         volatile long finishedAt;
 
         Job(GitHubRepo repo) {
@@ -73,18 +75,31 @@ final class AuditJobs implements AutoCloseable {
     }
 
     private final Map<String, Job> jobs = new LinkedHashMap<>();
-    private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
-        Thread thread = new Thread(r, "audit-worker");
-        thread.setDaemon(true);
-        return thread;
-    });
+    private final ExecutorService worker = daemon("audit-worker");
+    /** Embedding runs apart from audits, so a paced cloud quota never holds up the next audit. */
+    private final ExecutorService vectorWorker = daemon("vector-worker");
     private final Database database;
+    private final Database embeddingCache;
     private final Embedder embedder;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
     AuditJobs(Database database, Embedder embedder) {
+        this(database, database, embedder);
+    }
+
+    /** @param embeddingCache its own connection, since the vector worker writes while audits run */
+    AuditJobs(Database database, Database embeddingCache, Embedder embedder) {
         this.database = database;
+        this.embeddingCache = embeddingCache;
         this.embedder = embedder;
+    }
+
+    private static ExecutorService daemon(String name) {
+        return Executors.newSingleThreadExecutor(r -> {
+            Thread thread = new Thread(r, name);
+            thread.setDaemon(true);
+            return thread;
+        });
     }
 
     Optional<Job> get(String id) {
@@ -134,14 +149,18 @@ final class AuditJobs implements AutoCloseable {
             job.progress = "Cloning and parsing";
             List<AuditAgent> agents = List.of(new DeadDepAgent(), new PatternDriftAgent(), new SpecDriftAgent());
             // Static analysis only: audits are fast and free, and the LLM quota is kept for questions.
-            AuditPipeline.Result result = AuditPipeline.run(job.repo.cloneUrl(), database, null, agents, embedder,
-                    message -> job.progress = "Building the search index: " + message);
+            // Keyword search is ready with the audit; vectors follow in the background (see addVectors).
+            AuditPipeline.Result result = AuditPipeline.run(job.repo.cloneUrl(), database, null, agents, null, message -> {});
             job.commit = result.snapshot().commitSha();
             job.json = JsonReport.render(result);
             job.html = HtmlReport.render(result);
             job.rag = result.rag();
             job.status = Status.DONE;
             job.progress = "Done";
+            if (embedder != null) {
+                job.vectors = "building: waiting";
+                vectorWorker.submit(() -> addVectors(job));
+            }
         } catch (Exception e) {
             job.error = friendly(e);
             job.status = Status.FAILED;
@@ -150,6 +169,23 @@ final class AuditJobs implements AutoCloseable {
             job.status = Status.FAILED;
         } finally {
             job.finishedAt = System.currentTimeMillis();
+        }
+    }
+
+    /** Embeds the job's chunks and swaps in the hybrid index; questions use keywords until it's ready. */
+    private void addVectors(Job job) {
+        try {
+            RagIndex upgraded = job.rag.withVectors(embedder, embeddingCache, message -> job.vectors = "building: " + message);
+            if (upgraded.hasVectors()) {
+                job.rag = upgraded;
+                job.vectors = "ready";
+            } else {
+                String reason = upgraded.warnings().isEmpty() ? "no vectors" : upgraded.warnings().get(0);
+                job.vectors = "unavailable: " + (reason.contains("429") || reason.contains("quota")
+                        ? "the free embedding quota is used up for now" : reason.length() > 160 ? reason.substring(0, 160) + "..." : reason);
+            }
+        } catch (Exception | OutOfMemoryError e) {
+            job.vectors = "unavailable: " + e.getClass().getSimpleName();
         }
     }
 
@@ -193,5 +229,6 @@ final class AuditJobs implements AutoCloseable {
     @Override
     public void close() {
         worker.shutdownNow();
+        vectorWorker.shutdownNow();
     }
 }

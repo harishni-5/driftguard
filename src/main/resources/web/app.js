@@ -76,9 +76,8 @@ function render(job) {
   $("report-link").href = "/report/" + encodeURIComponent(job.id);
   const commit = job.commit ? job.commit.slice(0, 7) : "unknown";
   $("repo-meta").textContent = `Commit ${commit} · ${job.chunks} code and doc sections indexed`;
-  $("search-meta").textContent = job.canAnswer
-    ? `Search: ${job.search}. Answers by a free LLM; check the sources.`
-    : `Search: ${job.search}. No LLM configured, so you'll get the matching code.`;
+  showSearchStatus(job);
+  watchVectors(job.id);
 
   const findings = job.audit.findings || [];
   const likely = findings.filter((f) => f.decidedBy !== "UNVERIFIED");
@@ -96,6 +95,28 @@ function render(job) {
   state.history = [];
   renderSuggestions();
   selectTab("findings");
+}
+
+function showSearchStatus(job) {
+  let search = "keyword search";
+  if (job.vectors === "ready") search = "hybrid search (keywords + semantic vectors)";
+  else if ((job.vectors || "").startsWith("building")) search = "keyword search; semantic search is being built";
+  else if ((job.vectors || "").startsWith("unavailable")) search = "keyword search (" + job.vectors.replace("unavailable: ", "") + ")";
+  $("search-meta").textContent = (job.canAnswer ? "Answers by a free LLM from " : "Matching code from ") + search
+    + (job.canAnswer ? ". Check the sources." : ".");
+}
+
+/** Semantic vectors are built after the audit; refresh the status line until they're ready or given up. */
+async function watchVectors(id) {
+  for (let i = 0; i < 90 && state.id === id; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 8000));
+    if (state.id !== id) return;
+    try {
+      const job = await api("/api/audit/" + encodeURIComponent(id));
+      showSearchStatus(job);
+      if (!(job.vectors || "").startsWith("building")) return;
+    } catch (_) { return; }
+  }
 }
 
 function stat(value, label) {

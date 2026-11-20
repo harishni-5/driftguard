@@ -57,6 +57,12 @@ public final class WebServer implements AutoCloseable {
         return new WebServer(port, new AuditJobs(database, embedder), llm);
     }
 
+    /** @param embeddingCache a second connection to the same database, used by the background vector worker */
+    public static WebServer create(int port, dev.driftguard.store.Database database, dev.driftguard.store.Database embeddingCache,
+                                   dev.driftguard.rag.Embedder embedder, LlmClient llm) throws IOException {
+        return new WebServer(port, new AuditJobs(database, embeddingCache, embedder), llm);
+    }
+
     WebServer(int port, AuditJobs jobs, LlmClient llm) throws IOException {
         this.jobs = jobs;
         this.llm = llm;
@@ -154,6 +160,7 @@ public final class WebServer implements AutoCloseable {
             out.set("audit", JSON.readTree(job.json));
             out.put("chunks", job.rag.chunks().size());
             out.put("search", job.rag.describe());
+            out.put("vectors", job.vectors);
             out.put("canAnswer", llm != null);
         }
         sendJson(exchange, 200, out);

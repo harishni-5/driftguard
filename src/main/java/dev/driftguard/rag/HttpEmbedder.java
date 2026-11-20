@@ -26,7 +26,10 @@ final class HttpEmbedder implements Embedder {
     enum Style { OPENAI, GEMINI }
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final int MAX_ATTEMPTS = 4;
+    private static final int MAX_ATTEMPTS = 6;
+    /** Longest wait honoured on a 429. Longer means a daily quota, which waiting a minute won't fix. */
+    static final long MAX_RETRY_WAIT_MILLIS = 65_000;
+    private static final java.util.regex.Pattern RETRY_DELAY = java.util.regex.Pattern.compile("\"retryDelay\"\\s*:\\s*\"(\\d+(?:\\.\\d+)?)s\"");
     private static final int MAX_CHARS = 6000; // both models cut off around 2,000 tokens anyway
     static final int GEMINI_DIMENSIONS = 768;
 
@@ -39,9 +42,18 @@ final class HttpEmbedder implements Embedder {
     private final int batchSize;
     private final boolean cloud;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    /** Texts sent per rolling minute, kept under the provider's free limit; 0 means unlimited (local Ollama). */
+    private final int textsPerMinute;
+    private final java.util.ArrayDeque<long[]> sent = new java.util.ArrayDeque<>(); // {time, texts}
 
     HttpEmbedder(Style style, String baseUrl, String apiKey, String model, String documentPrefix, String queryPrefix,
                  int batchSize, boolean cloud) {
+        this(style, baseUrl, apiKey, model, documentPrefix, queryPrefix, batchSize, cloud, 0);
+    }
+
+    HttpEmbedder(Style style, String baseUrl, String apiKey, String model, String documentPrefix, String queryPrefix,
+                 int batchSize, boolean cloud, int textsPerMinute) {
+        this.textsPerMinute = textsPerMinute;
         this.style = style;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.apiKey = apiKey;
@@ -69,6 +81,7 @@ final class HttpEmbedder implements Embedder {
 
     @Override
     public List<float[]> embedDocuments(List<String> texts) throws LlmException {
+        pace(texts.size()); // bulk indexing is paced; single questions below are not, so they never queue behind it
         return embed(texts.stream().map(t -> documentPrefix + t).toList(), "RETRIEVAL_DOCUMENT");
     }
 
@@ -113,6 +126,48 @@ final class HttpEmbedder implements Embedder {
         return vectors;
     }
 
+    /**
+     * Waits until sending {@code texts} more stays under the per-minute limit. Gemini's free tier counts each
+     * text in a batch as a request (about 100 a minute), so firing batches back to back runs out within seconds.
+     */
+    private synchronized void pace(int texts) throws LlmException {
+        if (textsPerMinute <= 0) return;
+        while (true) {
+            long now = System.currentTimeMillis();
+            while (!sent.isEmpty() && sent.peekFirst()[0] <= now - 60_000) sent.removeFirst();
+            int used = sent.stream().mapToInt(e -> (int) e[1]).sum();
+            if (used + texts <= textsPerMinute || sent.isEmpty()) {
+                sent.addLast(new long[] {now, texts});
+                return;
+            }
+            sleep(sent.peekFirst()[0] + 60_000 - now + 50);
+        }
+    }
+
+    /** How long a 429 says to wait: Gemini's retryDelay, else Retry-After, else a growing default. */
+    static long retryWaitMillis(HttpResponse<String> response, int attempt) {
+        java.util.regex.Matcher delay = RETRY_DELAY.matcher(response.body() == null ? "" : response.body());
+        if (delay.find()) return (long) (Double.parseDouble(delay.group(1)) * 1000) + 500;
+        java.util.Optional<String> header = response.headers().firstValue("retry-after");
+        if (header.isPresent()) {
+            try {
+                return Long.parseLong(header.get().strip()) * 1000;
+            } catch (NumberFormatException ignored) {
+                // an HTTP date; fall through to the default
+            }
+        }
+        return 5_000L * attempt;
+    }
+
+    private static void sleep(long millis) throws LlmException {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new LlmException("Interrupted while waiting for the embedding quota", e);
+        }
+    }
+
     private JsonNode post(String url, String body) throws LlmException {
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(url))
                 .timeout(Duration.ofMinutes(cloud ? 1 : 5))
@@ -132,18 +187,17 @@ final class HttpEmbedder implements Embedder {
             }
             int status = response.statusCode();
             if ((status == 429 || status == 503) && attempt < MAX_ATTEMPTS) {
-                try {
-                    Thread.sleep(5_000L * attempt); // free tiers rate-limit; back off and retry
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new LlmException("Interrupted while waiting to retry", e);
+                long wait = retryWaitMillis(response, attempt);
+                if (wait <= MAX_RETRY_WAIT_MILLIS) {
+                    sleep(wait);
+                    continue;
                 }
-                continue;
             }
             if (status / 100 != 2) {
                 String text = response.body();
                 throw new LlmException("Embedding request failed with HTTP " + status + ": "
-                        + (text.length() > 300 ? text.substring(0, 300) + "..." : text));
+                        + (status == 429 ? "free quota used up (" : "") + (text.length() > 800 ? text.substring(0, 800) + "..." : text)
+                        + (status == 429 ? ")" : ""));
             }
             try {
                 return JSON.readTree(response.body());

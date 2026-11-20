@@ -390,4 +390,64 @@ class RagTest {
         assertTrue(llm.user.contains("<conversation>") && llm.user.contains("earlier answer"));
         assertTrue(llm.system.contains("General knowledge") || llm.system.contains("general knowledge"));
     }
+
+    @Test
+    void anEmptyReplyBecomesAHelpfulMessage() throws Exception {
+        RagIndex index = RagIndex.build(repo(Map.of("app/auth.py", AUTH)), null, null, m -> {});
+        Answerer.Answer answer = Answerer.ask(new FakeLlm(new Answerer.Reply("  ", List.of(), false, false)),
+                "how long do links last?", index.search("email", 3));
+        assertFalse(answer.text().isBlank());
+        assertTrue(answer.text().contains("closest matches"), answer.text());
+        assertFalse(answer.answerable());
+    }
+
+    @Test
+    void geminiRateLimitsAreWaitedOutThenSucceed() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1beta/models/gemini-embedding-001:batchEmbedContents", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            boolean limited = calls.incrementAndGet() == 1;
+            byte[] bytes = (limited
+                    ? "{\"error\":{\"code\":429,\"details\":[{\"retryDelay\":\"0.2s\"}]}}"
+                    : "{\"embeddings\":[{\"values\":[1,0]}]}").getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(limited ? 429 : 200, bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.close();
+        });
+        server.start();
+        try {
+            Embedder embedder = new HttpEmbedder(HttpEmbedder.Style.GEMINI, "http://127.0.0.1:" + server.getAddress().getPort() + "/v1beta",
+                    "k", "gemini-embedding-001", "", "", 25, true, 80);
+            long start = System.currentTimeMillis();
+            assertEquals(1, embedder.embedDocuments(List.of("one")).size());
+            assertEquals(2, calls.get(), "retried once after the 429");
+            assertTrue(System.currentTimeMillis() - start >= 200, "waited the retryDelay Gemini asked for");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void dailyQuotaFailsFastInsteadOfHanging() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1beta/models/gemini-embedding-001:batchEmbedContents", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            byte[] bytes = "{\"error\":{\"code\":429,\"details\":[{\"retryDelay\":\"40000s\"}]}}".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(429, bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.close();
+        });
+        server.start();
+        try {
+            Embedder embedder = new HttpEmbedder(HttpEmbedder.Style.GEMINI, "http://127.0.0.1:" + server.getAddress().getPort() + "/v1beta",
+                    "k", "gemini-embedding-001", "", "", 25, true, 80);
+            long start = System.currentTimeMillis();
+            LlmException e = assertThrows(LlmException.class, () -> embedder.embedDocuments(List.of("one")));
+            assertTrue(e.getMessage().contains("free quota used up"), e.getMessage());
+            assertTrue(System.currentTimeMillis() - start < 5_000);
+        } finally {
+            server.stop(0);
+        }
+    }
 }

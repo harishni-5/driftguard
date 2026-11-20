@@ -53,7 +53,8 @@ final class ServeCommand implements Callable<Integer> {
         LlmClient llm = chooseLlm();
         Embedder embedder = EmbedderFactory.fromSystem().create(embed).orElse(null);
         Database database = Database.open(db);
-        WebServer server = WebServer.create(port, database, embedder, llm);
+        Database embeddingCache = Database.open(db); // second connection: the vector worker writes alongside audits
+        WebServer server = WebServer.create(port, database, embeddingCache, embedder, llm);
         server.start();
         System.out.println("DriftGuard website on http://localhost:" + port);
         System.out.println("  answers: " + (llm == null ? "none (set GROQ_API_KEY)" : llm.model()));

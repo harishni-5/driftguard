@@ -170,6 +170,14 @@ public final class RagIndex {
         return index;
     }
 
+    /**
+     * The same chunks with vectors added, for upgrading a keyword-only index in the background. The
+     * original stays usable meanwhile, and if embedding fails the result is keyword-only with a warning.
+     */
+    public RagIndex withVectors(Embedder embedder, Database cache, Consumer<String> progress) throws SQLException {
+        return build(chunks, embedder, cache, progress, VectorStrategy.AUTO, null);
+    }
+
     public List<Chunk> chunks() {
         return chunks;
     }
